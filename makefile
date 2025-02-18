@@ -33,6 +33,13 @@ not:
 	mcopy -i floppy.img ./cdcmd/line.bin ::line.bin
 	clear
 	
+commit:
+	@read -p "Enter commit message: " msg && \
+	git add . && \
+	git commit -m "$$msg" && \
+	git push origin main
+
+	
 fatcheck:
 	@echo main
 	fsck.vfat floppy.img
