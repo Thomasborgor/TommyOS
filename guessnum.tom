@@ -1,0 +1,32 @@
+def ans
+def gss
+def nmg
+prt "Guess the number"
+inc yyy
+rnd 000 100 ans
+ask str1
+int str1 gss
+cmp gss ans
+jgr 025
+cmp gss ans
+jls 029
+inc nmg
+prt "You guessed the number!"
+inc yyy
+prt "The number was "
+mov 015 xxx
+prt ans
+inc yyy
+mov 000 xxx
+prt "Number of guesses was "
+mov 022 xxx
+prt nmg
+hlt
+prt "Too high!"
+inc yyy
+inc nmg
+jmp 007
+prt "Too low!"
+inc yyy
+inc nmg
+jmp 007

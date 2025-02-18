@@ -1,0 +1,44 @@
+find_next_line: ;with check
+	cmp byte [si], 10 ;checks for 0x0a (COMES FIRST)
+	je found_next_line_and_add
+	cmp word [offset_counter], 43008 ;no 0x0a, so checks if the first line (bugged)
+	jle weird_thingy_newl
+	inc si ;checks again
+	inc word [offset_counter]
+	jmp find_next_line
+	
+weird_thingy_newl: ;idk why i added this
+	add si, 2 ;but i am scared to get rid of it
+	add word [offset_counter], 2
+	jmp found_next_line_and_add
+
+found_next_line_and_add: ;we found a 0x0a, so that means there is a newline
+	call prep_si ;preps si
+	lodsb ;loads next character
+	inc word [offset_counter]
+	cmp al, 0x0a ;checks if 0x0a again????? WHY?
+	je found_next_line_but_ret 
+	is_a_0x0d: ;it is?
+	cmp al, 0x0d ;lets check
+	jne found_it_next_l ;if not equal to 0d
+	idk:
+	inc si ;check again because it is 0d
+	inc word [offset_counter]
+	jmp found_next_line_and_add
+	
+found_next_line_but_ret:
+	lodsb
+	inc word [offset_counter]
+	cmp al, 0x0d
+	je idk
+	dec word [offset_counter]
+	jmp found_next_line_and_add
+	
+found_it_next_l:
+	dec word [offset_counter] ;decrement???????????????
+	dec si ;WHY?
+	
+	cmp word si, [end_of_file]
+	jge halt
+	
+	ret

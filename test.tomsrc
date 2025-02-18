@@ -1,0 +1,63 @@
+def hi
+def bye
+mov 003 bye
+mov 003 hi
+cmp hi bye
+jne not_equal
+prt "equal"
+hlt
+not_equal:
+prt "they are not equal!"
+mov byte [counter], 0
+	xor ax, ax
+	mov si, entire_command
+	add si, 5
+	cmp byte [si+1], ':'
+	je check_for_diskette
+	mov byte [counter], 0
+	
+	after_thingy1:
+	xor si, si
+	mov si, entire_command
+	add si, 5
+	mov di, input_buffer_copy
+	find_name_loop_copy:
+		inc word [counter]
+		cmp byte [si], ' '
+		je done1_copy
+		lodsb
+		stosb
+		jmp find_name_loop_copy
+	done1_copy:
+	mov si, input_buffer_copy
+	mov di, kernel_iden
+	call os_string_compare
+	jc no_modify_kernel
+	
+	mov di, super_iden
+	call os_string_compare
+	jc no_super_allowed
+	
+	mov si, entire_command
+	add si, 5
+	add si, [counter]
+	cmp byte [si + 3], ':'
+	je check_for_diskette_two
+	mov al, [si+3]
+	mov ah, 0eh
+	int 0x10
+	jmp $
+	after_thingy2:
+	mov si, entire_command
+	add si, 5
+	
+	add word si, [counter]
+	mov di, input_buffer_copy_copy
+	find2_copy:
+		cmp byte [si], 0
+		je done2_copy
+		lodsb
+		stosb
+	
+		jmp find2_copy
+	done2_copy:

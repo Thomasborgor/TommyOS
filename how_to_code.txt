@@ -1,0 +1,57 @@
+To code in TommyOS BASIC, here is a full comprehensive guide.
+TommyOS BASIC is, as the name implies, a pretty low level language. It doesn't have some of the qualities you would expect other programming languages to have, like C or C++.
+
+In TommyOS BASIC, you create a file with the extension .tomsrc, or TOMmyos SouRCe file. You then use my custom Unix command, tomc, to compile that into a runnable .tom file.
+But you cannot run a .tom file inside a Unix terminal. TOM files are meant tp be run by TommyOS BASIC Interpreter, or BASIC.BIN in TommyOS Kernel 1.1. 
+
+TommyOS BASIC has many commands to choose from. To start off easy, we will learn about the first 5 commands. 
+THe first five that we will look at are 'mov', 'add', 'sub', 'jmp', and 'def'.
+The mov command works like the assembly mov, except that it uses the syntax 'mov source, destination'. You can say 'mov var two'. 
+That might look a little weird. That is because TommyOS BASIC does not use commas to separate parameters. 
+Speaking of parameters, that brings us to a little caveat. If you were to use the command, 'mov 5 var', it would error out. That is because TommyOS BASIC uses a strict 3, 3, 3, rule.
+3 chars for the command, 3 chars for the second parameter, and 3 chars for the third. There are exceptions, and we will get to that later. But in order to save a number to a variable, you need to pad it to three digits.
+
+The second command is add. It works the exact same as mov and is also the same as sub. 
+
+The fourth command is jmp. Jmp takes in either a user defined label, declared by a word and a colon, or a 3 digit number. tomc will automatically compile the labels.
+
+The final command is def. def is shortened DEFine, and it defines a min two max three char variable. Def can also reset the offset of a string. Variables are special, and do not need to be padded like numbers. TommyOS knows.
+
+With these commands, we can write a simple program that never ends. (Note that you do NOT have to write line numbers in tomsrc files.)
+1. def var ;creates variable 'var' with value zero.
+2. mov 010 var ;moves the value of ten to var
+3. add 001 var ;adds one to var.
+4. sub 002 var ;subtracts two from var.
+5. jmp 002 ;jumps to line two and repeats infintely.
+
+You are getting really good at BASIC. Now, we will learn the rest of the commands. 
+
+The 'prt' command is one of the exceptions. PRT can either take a variable and print it's value to the screen, or premade strings 'str1' or 'str2' and print them, or can print a string declared by " and ended by " to the screen. 
+Where prt prints to the screen is defined by two variables, xxx and yyy. 
+
+The clr command clears the screen.
+
+Inc and dec add and sub one to a variable. They also add/sub one to the offset of a string of your choice.
+
+the 'cmp' command compares the first value to a second value. THe first value cannot be a number. 
+Whatever the outcome of the cmp command, it will be stored into special flags. With these flags, you can either jmp if not equal 'jne'
+Jump if equal, 'jye', jump if greater, 'jgr', or jump if lesser, 'jls'.
+
+The command 'cmpsr' has no params and compares the two strings and returns flags like cmp.
+
+The command hlt prematurely ends the BASIC program immediately.
+
+The 'del' command delays for either a number amount of ~1/2 seconds or a variable amount.
+
+The 'bel' command has two params, the frequency, number or var, and then duration, number.
+
+The command 'ask' has one param, and is one of the two strings.
+
+The command 'getky' is a difficult one. Getky can sometimes have 1 param, sometimes have three. What it's goal is to get a user input. If you put in 'getky "a"', then it will wait until the user inputs the lowercase a key.
+There is also 'getky 032' which will wait until it recieves al=32, or a space press. There is also 'getky var', where whatever key pressed will go into var variable. 
+THen we have the non-waiting version of getky. See, instead of it's first param being a number or quotes or a variable, it is just a %. An example of a non-waiting command would be 'getky % 003 one'.
+You might notice something. THere are two other commands, 003 and one. See, this command is very versatile as if the non-waiting keypress is zero (no keypress), it will jump to 003. If there is a keypress, then it will continue, not jumping to 003, and save the value to one.
+
+The final command is 'int'. It has two params, the first being one of the two strings and it will convert the string to an integer and save it to the second param, a variable.
+
+You now know basic! Yay!
