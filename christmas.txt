@@ -1,6 +1,0 @@
-
-prt "hi"
-clr
-hlt
-inc yyy
-prt "you should not see this"
