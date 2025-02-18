@@ -8,7 +8,6 @@ not:
 	nasm -fbin ./cdcmd/screensaver.asm -o ./cdcmd/screensaver.bin
 	nasm -fbin ./cdcmd/tlang.asm -o ./cdcmd/tlang.bin
 	nasm -fbin ./cdcmd/haha.asm -o ./cdcmd/haha.bin
-	nasm -fbin ./extra/fullhddboot.asm -o ./fullhddboot.bin
 	nasm -fbin ./cdcmd/line.asm -o ./cdcmd/line.bin
 	@echo "Creating Preloaded Images..."
 	#bmp-pcx ./extra/sample.bmp ./extra/logo.pcx
@@ -29,8 +28,6 @@ not:
 	mcopy -i image2.img ./extra/logo.pcx ::LOGO.PCX
 	mcopy -i floppy.img ./guessnum.tom ::number.TOM
 	mcopy -i floppy.img ./cdcmd/haha.bin ::format.bin
-	mcopy -i floppy.img ./extra/snake.tom ::SNAKE.TOM
-	mcopy -i floppy.img ./cdcmd/line.bin ::line.bin
 	clear
 	
 commit:
@@ -39,27 +36,6 @@ commit:
 	git commit -m "$$msg" && \
 	git push origin main
 
-	
-fatcheck:
-	@echo main
-	fsck.vfat floppy.img
-	@echo image2
-	fsck.vfat image2.img
-	@echo HDD
-	fsck.vfat mydisk.img
-	
-boothdd:
-	qemu-system-i386 -drive file=mydisk.img,format=raw,if=ide,index=0
-
-	
-hdd:
-	nasm -fbin ./extra/fullhddboot.asm -o ./extra/fullhddboot.bin
-	rm mydisk.img
-	dd if=/dev/zero of=mydisk.img count=2880 bs=512 conv=notrunc
-	#mkdosfs -C mydisk.img 1440 -F12 -M0xF8
-	dd if=./extra/fullhddboot.bin of=mydisk.img bs=512 count=11 conv=notrunc
-	
-	
 small:
 	qemu-system-x86_64 -boot order=ac -fda floppy.img -fdb image2.img -hda mydisk.img
 
