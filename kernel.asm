@@ -77,7 +77,7 @@ main1:
 	mov dl, 41
 	int 0x10
 	
-	mov bx, 100 ;delay on boot
+	mov bx, 0 ;delay on boot
 	call delay
 	
 	call clear
@@ -282,7 +282,7 @@ parse: ;how we are going to do this:
 boot_pcx db 'BOOT.PCX', 0
 found_custom_boot:
 	call os_print_pcx
-	mov bx, 100
+	mov bx, 0
 	call delay
 	mov ax, 3			; Back to text mode
 	mov bx, 0

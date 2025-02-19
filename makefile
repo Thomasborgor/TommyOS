@@ -28,6 +28,7 @@ not:
 	mcopy -i image2.img ./extra/logo.pcx ::LOGO.PCX
 	mcopy -i floppy.img ./guessnum.tom ::number.TOM
 	mcopy -i floppy.img ./cdcmd/haha.bin ::format.bin
+	mcopy -i floppy.img ./cdcmd/line.bin ::ASCII.bin
 	clear
 	
 commit:

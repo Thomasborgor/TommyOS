@@ -21,3 +21,6 @@ Please report any bugs you find!
 Thanks for the support,
 
 TommyOS team
+
+
+A very big thanks to MikeOS!
