@@ -4,9 +4,6 @@ mov [buffer], word si
 mov [SecsPerTrack], ax
 mov [Sides], bx
 mov [bootdev], dl
-
-
-mov [buffer], word si
 cmp byte [si], 0xFF
 je no_input_file
 mov ax, si
