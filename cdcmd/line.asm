@@ -26,14 +26,16 @@ draw_char:
     mov bp, 8       ; 8 rows (height)
 
 row_loop:
-    push cx         ; Save row (Y position)
-    push dx         ; Save starting column (X position)
+    push cx         ; Save Y position
+    push dx         ; Save X position
     mov al, [si]    ; Load font row (bit pattern)
-    mov bl, 8       ; 8 columns (width)
+    mov bx, 0       ; Reset column counter
 
 col_loop:
-    shr al, 1       ; Shift right, bit goes into CF
-    jnc skip_pixel  ; If CF = 0, skip pixel plotting
+    xor bh, bh
+    mov bl, [mask_values+bx]  ; Load bitmask for this column
+    test al, bl               ; Check if the corresponding bit is 1
+    jz skip_pixel             ; If bit is 0, skip pixel plotting
 
     ; Draw pixel at (DX, CX)
     mov ah, 0x0C    ; BIOS: Put Pixel
@@ -43,18 +45,23 @@ col_loop:
 
 skip_pixel:
     inc dx          ; Move to next column (X)
-    dec bl          ; Decrease column count
-    jnz col_loop    ; Loop for 8 columns
+    inc bx          ; Move to next bit position
+    cmp bx, 8       ; If all 8 columns are drawn
+    jl col_loop     ; Keep looping
 
-    pop dx          ; Restore starting column (X)
+    pop dx          ; Restore X position
     pop cx          ; Restore Y position
-    inc cx          ; Move to next row (Y)
-    inc si          ; Move to next font byte
+    inc cx          ; Move down to next row (Y)
+    inc si          ; Move to next font byte (next row)
     dec bp          ; Decrease row count
     jnz row_loop    ; Loop for 8 rows
 
     pop si
     ret
+
+; 8-bit masks for testing each bit
+mask_values:
+    db 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01
 
 ; 8x8 font for 'A' (bit pattern)
 font_A:

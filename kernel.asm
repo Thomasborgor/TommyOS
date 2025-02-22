@@ -77,7 +77,7 @@ main1:
 	mov dl, 41
 	int 0x10
 	
-	mov bx, 0 ;delay on boot
+	mov bx, 100 ;delay on boot
 	call delay
 	
 	call clear
@@ -282,7 +282,7 @@ parse: ;how we are going to do this:
 boot_pcx db 'BOOT.PCX', 0
 found_custom_boot:
 	call os_print_pcx
-	mov bx, 0
+	mov bx, 100
 	call delay
 	mov ax, 3			; Back to text mode
 	mov bx, 0
@@ -349,6 +349,10 @@ compare_string:
 
 figure_out_drive:
 	lodsb
+	cmp al, 65
+	jl unknown_command_place
+	cmp al, 90
+	jg unknown_command_place
 	cmp al, 42h
 	jle set_a
 	add al, 61 ;must a letter larger then B, so C or above, then we add 61 to get 0x80
@@ -451,6 +455,10 @@ copy_do:
 	mov si, entire_command
 	add si, 5
 	lodsb
+	cmp al, 65
+	jl unknown_command_place
+	cmp al, 90
+	jg unknown_command_place
 	cmp al, 'B'
 	jle is_a_or_b
 	add al, 61
@@ -491,6 +499,10 @@ copy_do:
 	xor ah, ah
 	add si, ax
 	lodsb
+	cmp al, 65
+	jl unknown_command_place
+	cmp al, 90
+	jg unknown_command_place
 	cmp al, 'B'
 	jle is_a_or_b_2
 	add al, 61
