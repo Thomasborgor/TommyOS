@@ -36,11 +36,6 @@ commit:
 	git commit -m "$$msg" && \
 	git push origin main
 
-autocommit:
-	git add . && \
-	git commit -m "Init" && \
-	git push origin main
-
 small:
 	qemu-system-x86_64 -boot order=ac -fda floppy.img -fdb image2.img -hda mydisk.img
 
