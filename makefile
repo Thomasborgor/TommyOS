@@ -37,7 +37,7 @@ commit:
 	@read -p "Enter commit message: " msg; \
 	git add . && \
 	git commit -m "$$msg" && \
-	git push origin main
+	git push --force origin main 
 
 small:
 	qemu-system-x86_64 -boot order=ac -fda floppy.img -fdb image2.img -hda mydisk.img
