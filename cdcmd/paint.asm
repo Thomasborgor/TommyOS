@@ -8,6 +8,7 @@ int 10h               ; BIOS video interrupt
 mov ah, 0x00     ; BIOS video service
 mov al, 0x13     ; Video mode 13h (320x200, 256 colors)
 int 0x10         ; BIOS interrupt for video services
+jmp start
 mov cx, 10
 mov dx, 10
 mov word [temp_cx], 100
@@ -50,11 +51,15 @@ start:
     ; Draw initial dot
     call draw_dot
 
+
 main_loop:
     ; Wait for a keypress
-    xor ah, ah       ; AH = 0, BIOS keyboard service (wait for keypress)
-    int 0x16         ; BIOS interrupt for keyboard services
-
+	inc byte [color]
+	drawing_dot:
+	call draw_dot
+	dec byte [color]
+	xor ah, ah
+	int 0x16
     cmp ah, 0x48     ; Check if Up arrow (0x48)
     je move_up
     cmp ah, 0x50     ; Check if Down arrow (0x50)
@@ -71,8 +76,27 @@ main_loop:
 	
 	cmp ah, 0x01
 	je alt
+	cmp al, '~'
+	je save_file_pcx
 
+	
     jmp main_loop    ; Loop back to wait for another keypress
+	
+
+save_file_pcx:
+	mov ax, 0xa000
+	mov gs, ax
+    mov al, gs:[si]
+	jmp $
+
+filename_buf2 db 'IMAGE.PCX', 0
+
+error:
+    mov ax, 0x0003
+    int 0x10
+    mov ax, 0x0e01
+    int 0x10
+    jmp $
 	
 alt:
 	pusha
@@ -124,37 +148,39 @@ reset_color_down:
     jmp main_loop
 
 move_up:
-    cmp dx, 1               ; Check if we're at the top of the screen
+    cmp dx, 0               ; Check if we're at the top of the screen
     jle main_loop            ; If yes, don't move
-    sub dx, 3                ; Move the cursor up
-    call draw_dot            ; Draw the dot at the new position
+	call draw_dot            ; Draw the dot at the new position
+    dec dx	               ; Move the cursor up
     jmp main_loop
 
 move_down:
-    cmp dx, 197              ; Check if we're at the bottom of the screen (199 is the max Y)
+    cmp dx, 199              ; Check if we're at the bottom of the screen (199 is the max Y)
     jge main_loop            ; If yes, don't move
-    add dx, 3                ; Move the cursor down
     call draw_dot            ; Draw the dot at the new position
+    inc dx                ; Move the cursor down
     jmp main_loop
 
 move_left:
-    cmp cx, 2                ; Check if we're at the left edge
-    jle main_loop            ; If yes, don't move
-    sub cx, 3                ; Move the cursor left
-    call draw_dot            ; Draw the dot at the new position
+    cmp cx, 0                ; Check if we're at the left edge
+    jle adjust_left            ; If yes, don't move
+	call draw_dot            ; Draw the dot at the new position
+    dec cx               ; Move the cursor left
     jmp main_loop
 
 move_right:
-    cmp cx, 317              ; Check if we're near the right edge
+    cmp cx, 319              ; Check if we're near the right edge
     jge adjust_right         ; If yes, go to adjustment
-    add cx, 3                ; Move the cursor right
     call draw_dot            ; Draw the dot at the new position
+    inc cx                ; Move the cursor right
     jmp main_loop
 
 adjust_right:
-    mov cx, 316              ; Set cx to the right edge
-    call draw_dot            ; Draw the dot at the right edge
+    mov cx, 0
     jmp main_loop
+	
+adjust_left:
+	mov cx, 319
 
 ; Subroutine to draw the current dot with the current color
 draw_dot:
@@ -170,33 +196,6 @@ draw_dot:
 
     ; Draw a 3x3 dot
     int 0x10
-    inc cx
-    int 0x10
-    inc dx
-    int 0x10
-    dec cx
-    int 0x10
-    dec dx
-    int 0x10
-    inc dx
-    int 0x10
-    dec cx
-    int 0x10
-    add cx, 2
-    int 0x10
-    dec dx
-    int 0x10
-    dec dx
-    int 0x10
-    dec cx
-    int 0x10
-    dec cx
-    int 0x10
-    inc dx
-    int 0x10
-    inc cx
-	int 0x10
-
 skip_draw:
     ret
 	
@@ -219,5 +218,10 @@ color db 0x0F                ; Variable to store current color
 welcome db 'Welcome back!', 10, 13, 0
 temp_cx dw 0
 temp_dx dw 0
+temp_byte db 0
+file_buffer times 10000 db 0
 
-
+%include "./extra/functions.asm"
+disk_buffer db 24576
+dirlist:
+delay:

@@ -127,7 +127,6 @@ main:
 		lea di, [input_buffer]
 		mov word [tmp_one], 0
 		input_loop:
-		inc cx
 		xor ah, ah
 		int 0x16
 		mov [di], al
@@ -135,6 +134,8 @@ main:
 		je backspace
 		cmp al, 0x0D
 		je parse
+		cmp al, 0
+		je input_loop
 		inc di
 		mov ah, 0x0e
 		int 0x10
@@ -282,7 +283,7 @@ parse: ;how we are going to do this:
 boot_pcx db 'BOOT.PCX', 0
 found_custom_boot:
 	call os_print_pcx
-	mov bx, 100
+	mov bx, 10
 	call delay
 	mov ax, 3			; Back to text mode
 	mov bx, 0
@@ -476,6 +477,8 @@ copy_do:
 	mov [Sides], dx
 	call ready_the_drive
 	ready_for_param_seek:
+	cmp byte [si], ':'
+	jne unknown_command_place
 	inc si
 	mov di, input_buffer_copy
 	get_the_first_file:
@@ -519,6 +522,8 @@ copy_do:
 	mov [Sides], dx
 	call ready_the_drive
 	ready_for_param_seek2:
+	cmp byte [si], ':'
+	jne unknown_command_place
 	inc si
 	mov di, input_buffer_copy_copy
 	get_the_second_file:
