@@ -9,6 +9,8 @@ not:
 	nasm -fbin ./cdcmd/tlang.asm -o ./cdcmd/tlang.bin
 	nasm -fbin ./cdcmd/haha.asm -o ./cdcmd/haha.bin
 	nasm -fbin ./cdcmd/line.asm -o ./cdcmd/line.bin
+	nasm -fbin ./cdcmd/paint.asm -o ./cdcmd/paint.bin
+
 	@echo "Creating Preloaded Images..."
 	#bmp-pcx ./extra/sample.bmp ./extra/logo.pcx
 	rm -f mydisk.img -f floppy.img -f image2.img
@@ -28,6 +30,7 @@ not:
 	mcopy -i image2.img ./extra/logo.pcx ::LOGO.PCX
 	mcopy -i floppy.img ./guessnum.tom ::number.TOM
 	mcopy -i floppy.img ./cdcmd/haha.bin ::format.bin
+	mcopy -i floppy.img ./cdcmd/paint.bin ::PAINT.BIN
 	clear
 	
 commit:
@@ -42,11 +45,11 @@ small:
 	clear
 	
 big:
-	qemu-system-x86_64 -fda floppy.img -full-screen
+	qemu-system-x86_64 -boot order=ac -fda floppy.img -fdb image2.img -hda mydisk.img -full-screen
 	clear
 	
 iso_image:
-	@echo no
+	mkisofs -quiet -V 'TOMMYOS' -input-charset iso-8859-1 -o ./floppy.iso -b floppy.img ./
 	
 tomc:
 	@rm -rf dist build tommyos_compile.spec
