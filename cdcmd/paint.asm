@@ -1,5 +1,24 @@
 [BITS 16]
 [ORG 32768]         ; The bootloader code starts at 0x7C00
+mov [bootdev], dl
+mov [SecsPerTrack], ax
+mov [Sides], bx
+
+mov di, filename_buf2
+save_filename:
+	lodsb
+	cmp al, 0
+	je no_more_chars
+	stosb
+	cmp di, 12
+	jl save_filename
+no_more_chars:
+
+mov ax, filename_buf2
+call os_file_exists
+jc dont_delete_the_file	
+call os_remove_file
+dont_delete_the_file:
 
 mov ah, 01h           ; Function 01h: Set Cursor Shape
 mov ch, 06h           ; Standard start scanline
@@ -44,8 +63,8 @@ start:
     int 0x10         ; BIOS interrupt for video services
 
     ; Initialize cursor position (starting in the middle of the screen)
-    mov cx, 160      ; X position
-    mov dx, 100      ; Y position
+    mov cx, 0      ; X position
+    mov dx, 0      ; Y position
     mov byte [color], 0x0F  ; Initialize color to white (0x0F)
 
     ; Draw initial dot
@@ -84,13 +103,140 @@ main_loop:
 	
 
 save_file_pcx:
-	mov ax, 0xa000
-	mov gs, ax
-    mov al, gs:[si]
-	jmp $
+	;right now I just need to test something
+	call draw_dot
+	push ds
+	push es
+mov ax, 0xa000        ; DS = video segment
+    mov ds, ax
+    mov ax, 0x2000        ; ES = file buffer segment
+    mov es, ax
+    mov di, file_buffer
+    add di, 80h           ; skip header area
+    mov si, 0             ; start of image data
+    mov cx, 64000           ; CX = Total pixels to encode
+    xor dl, dl              ; DL = Run length counter
+    mov bl, ds:[si]         ; BL = Current pixel value
 
-filename_buf2 db 'IMAGE.PCX', 0
+get_sample_RLE:
+    dec cx
+    jz flush_and_exit       ; If cx == 0, write last run and exit
 
+    inc si
+    mov al, ds:[si]         ; Read next pixel
+    inc dl                  ; Increment run length
+
+    cmp al, bl              ; Is this pixel same as last?
+    je check_run_length     ; If yes, continue the run
+
+    ; --- New Pixel Encountered! Store the previous run ---
+    cmp dl, 1
+    je store_single_byte    ; If single pixel, store without RLE header
+
+    ; Store RLE encoded run
+    or dl, 0xC0
+    mov byte es:[di], dl
+    inc di
+    mov byte es:[di], bl
+    inc di
+
+    xor dl, dl              ; Reset run counter
+    mov bl, al              ; Update current pixel
+    jmp get_sample_RLE
+
+check_run_length:
+    cmp dl, 63              ; Has run length exceeded max (63)?
+    jne get_sample_RLE      ; If not, continue accumulating
+
+    ; Store full run (max 63 pixels)
+    or dl, 0xC0
+    mov byte es:[di], dl
+    inc di
+    mov byte es:[di], bl
+    inc di
+
+    xor dl, dl              ; Reset run length
+    jmp get_sample_RLE
+
+store_single_byte:
+    mov byte es:[di], bl
+    inc di
+    xor dl, dl              ; Reset run length
+    mov bl, al
+    jmp get_sample_RLE
+
+flush_and_exit:
+    ; Final byte or run needs to be written
+    cmp dl, 0
+    je exit_loop
+
+    cmp dl, 1
+    je store_last_byte
+
+    ; Store the final run
+    or dl, 0xC0
+    mov byte es:[di], dl
+    inc di
+    mov byte es:[di], bl
+    inc di
+    jmp exit_loop
+
+store_last_byte:
+    mov byte es:[di], bl
+    inc di
+
+exit_loop:
+	pop es ;file starts at 11080
+	pop ds
+	add di, 2
+
+    mov cx, 768             ; 256 colors
+    mov si, sample_palette  ; Address of sample palette
+
+write_palette:
+    mov al, ds:[si]
+	mov es:[di], al
+	inc si
+	inc di
+    loop write_palette      ; Repeat for all 256 colors
+	
+	
+	mov ax, 0x0003
+	int 0x10
+	push di
+	mov ax, filename_buf2
+	call custom_create_file
+	pop di
+	mov cx, di;DO THIS================================
+	sub cx, file_buffer
+	mov bx, file_buffer
+	mov ax, filename_buf2
+	call os_write_file
+	ret
+	
+
+filename_buf2 times 12 db 0
+
+
+sample_palette:
+	db 00, 00, 00, ;black
+	db 00, 00, 192,  ;blue
+	db 00, 192, 00, ;green
+	db 00, 192, 192, ;cyan
+	db 192, 00, 00, ;red
+	db 192, 00, 192, ;magenta
+	db 200, 150, 00, ;brown
+	db 0xc0, 0xc0, 0xc0, ;light gray
+	db 80, 80, 80, ;dark grey
+	db 00, 00, 255,  ;light blue
+	db 00, 255, 00, ;light green 
+	db 00, 0xff, 255, ;light cyan 
+	db 255, 00, 00, ;light red
+	db 0xff, 00, 0xff, ;light magenta 
+	db 192, 192, 0,;yellow
+	db 0xff, 0xff, 0xff ;white
+	times 720 db 0
+	
 error:
     mov ax, 0x0003
     int 0x10
@@ -163,7 +309,7 @@ move_down:
 
 move_left:
     cmp cx, 0                ; Check if we're at the left edge
-    jle adjust_left            ; If yes, don't move
+    je adjust_left            ; If yes, don't move
 	call draw_dot            ; Draw the dot at the new position
     dec cx               ; Move the cursor left
     jmp main_loop
@@ -181,6 +327,7 @@ adjust_right:
 	
 adjust_left:
 	mov cx, 319
+	jmp main_loop
 
 ; Subroutine to draw the current dot with the current color
 draw_dot:
