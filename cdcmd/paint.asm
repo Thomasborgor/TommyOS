@@ -3,7 +3,9 @@
 mov [bootdev], dl
 mov [SecsPerTrack], ax
 mov [Sides], bx
-
+mov ah, 0x00     ; BIOS video service
+mov al, 0x13     ; Video mode 13h (320x200, 256 colors)
+int 0x10         ; BIOS interrupt for video services
 mov di, filename_buf2
 save_filename:
 	lodsb
@@ -16,17 +18,27 @@ no_more_chars:
 
 mov ax, filename_buf2
 call os_file_exists
-jc dont_delete_the_file	
+jc afterdjdjdj
+mov ax, filename_buf2
+call os_print_pcx
+mov ax, 2000h			; Reset ES back to original value
+mov es, ax
+mov ax, filename_buf2
 call os_remove_file
-dont_delete_the_file:
+jmp after_the_thingy
+
+
+afterdjdjdj:
+mov ah, 0x00     ;This might seem weird, but it is correct because if there is no existing file, it prints rando data and we just clear that out!
+mov al, 0x13     
+int 0x10         
+after_the_thingy:
 
 mov ah, 01h           ; Function 01h: Set Cursor Shape
 mov ch, 06h           ; Standard start scanline
 mov cl, 07h           ; Standard end scanline
 int 10h               ; BIOS video interrupt
-mov ah, 0x00     ; BIOS video service
-mov al, 0x13     ; Video mode 13h (320x200, 256 colors)
-int 0x10         ; BIOS interrupt for video services
+
 jmp start
 mov cx, 10
 mov dx, 10
@@ -58,9 +70,6 @@ draw_rect:
 
 start:
     ; Set video mode 320x200 (256 colors)
-    mov ah, 0x00     ; BIOS video service
-    mov al, 0x13     ; Video mode 13h (320x200, 256 colors)
-    int 0x10         ; BIOS interrupt for video services
 
     ; Initialize cursor position (starting in the middle of the screen)
     mov cx, 0      ; X position
@@ -207,11 +216,13 @@ write_palette:
 	mov ax, filename_buf2
 	call custom_create_file
 	pop di
+	jc error
 	mov cx, di;DO THIS================================
 	sub cx, file_buffer
 	mov bx, file_buffer
 	mov ax, filename_buf2
 	call os_write_file
+	jc error
 	ret
 	
 
