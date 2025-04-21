@@ -40,12 +40,12 @@ commit:
 	git push --force origin main 
 
 small:
-	qemu-system-x86_64 -boot order=ac -fda floppy.img -fdb image2.img -hda mydisk.img
+	qemu-system-x86_64 -boot order=a -fda floppy.img -fdb image2.img -hda mydisk.img
 
 	clear
 	
 big:
-	qemu-system-x86_64 -boot order=ac -fda floppy.img -fdb image2.img -hda mydisk.img -full-screen
+	qemu-system-x86_64 -boot order=a -fda floppy.img -fdb image2.img -hda mydisk.img -full-screen
 	clear
 	
 iso_image:
@@ -75,3 +75,7 @@ makehex:
 	@rm -rf dist build makehex.spec
 	pyinstaller --onefile ./makehex/makehex.py
 	sudo cp dist/makehex /usr/bin/makehex
+	
+	
+	
+		

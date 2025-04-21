@@ -778,9 +778,6 @@ os_create_file:
 	mov byte [di+31], 0		; File size
 
 	call disk_write_root_dir
-	jc .something
-
-
 	popa
 	clc				; Clear carry for success
 	ret
@@ -790,11 +787,7 @@ os_create_file:
 	stc
 	ret
 
-.something:
-	mov ax, 0x0e03
-	int 0x10
-	
-	jmp $
+
 	
 custom_create_file:
 call os_string_uppercase
@@ -846,6 +839,11 @@ jc errored
 
 ret
 
+errored:
+	mov ax, 0x0e01
+	int 0x10
+	jmp $
+
 convert_to_13h:
 push bx
 	push ax
@@ -873,10 +871,6 @@ push bx
 ; ******************************************************************
 ret
 
-errored:
-	mov ax, 0x0e01
-	int 0x10
-	ret
 
 filename_buf dw 0
 	
@@ -1460,8 +1454,13 @@ os_print_string:
 
 .repeat:
 	lodsb				; Get char from string
+	cmp byte [si], 255
+	je t255_thingy
 	cmp al, 0
 	je .done			; If char is zero, end of string
+	
+	cmp al, 254
+	je t254_thingy
 
 	int 10h				; Otherwise, print it
 	jmp .repeat			; And move on to next char
@@ -1469,41 +1468,18 @@ os_print_string:
 .done:
 	popa
 	ret
+	
+t255_thingy:
+	mov al, ','
+	int 0x10
+	mov al, ' '
+	int 0x10
+	add si, 1
+	jmp os_print_string.repeat
 
-
-
-
-; ------------------------------------------------------------------
-; os_move_cursor -- Moves cursor in text mode
-; IN: DH, DL = row, column; OUT: Nothing (registers preserved)
-
-os_move_cursor:
-	pusha
-	mov ah, 2
-	int 10h				; BIOS interrupt to move cursor
-
-	popa
-	ret
-
-
-; ------------------------------------------------------------------
-; os_get_cursor_pos -- Return position of text cursor
-; OUT: DH, DL = row, column
-
-os_get_cursor_pos:
-	pusha
-
-	mov bh, 0
-	mov ah, 3
-	int 10h				; BIOS interrupt to get cursor position
-
-	mov [.tmp], dx
-	popa
-	mov dx, [.tmp]
-	ret
-
-
-	.tmp dw 0
+t254_thingy:
+	inc si
+	jmp os_print_string.repeat
 
 
 ; ------------------------------------------------------------------
@@ -1522,135 +1498,6 @@ os_print_newline:
 
 	popa
 	ret
-
-
-; ------------------------------------------------------------------
-; os_print_space -- Print a space to the screen
-; IN/OUT: Nothing
-
-os_print_space:
-	pusha
-
-	mov ah, 0Eh			; BIOS teletype function
-	mov al, 20h			; Space is character 20h
-	int 10h
-
-	popa
-	ret
-
-
-
-
-; ------------------------------------------------------------------
-; os_input_string -- Take string from keyboard entry
-; IN/OUT: AX = location of string, other regs preserved
-; (Location will contain up to 255 characters, zero-terminated)
-
-os_input_string:
-	pusha
-
-	mov di, ax			; DI is where we'll store input (buffer)
-	mov cx, 0			; Character received counter for backspace
-
-
-.more:					; Now onto string getting
-	xor ah, ah
-	int 16h
-
-	cmp al, 13			; If Enter key pressed, finish
-	je .done
-
-	cmp al, 8			; Backspace pressed?
-	je .backspace			; If not, skip following checks
-
-	cmp al, ' '			; In ASCII range (32 - 126)?
-	jb .more			; Ignore most non-printing characters
-
-	cmp al, '~'
-	ja .more
-
-	jmp .nobackspace
-
-
-.backspace:
-	cmp cx, 0			; Backspace at start of string?
-	je .more			; Ignore it if so
-
-	call os_get_cursor_pos		; Backspace at start of screen line?
-	cmp dl, 0
-	je .backspace_linestart
-
-	pusha
-	mov ah, 0Eh			; If not, write space and move cursor back
-	mov al, 8
-	int 10h				; Backspace twice, to clear space
-	mov al, 32
-	int 10h
-	mov al, 8
-	int 10h
-	popa
-
-	dec di				; Character position will be overwritten by new
-					; character or terminator at end
-
-	dec cx				; Step back counter
-
-	jmp .more
-
-
-.backspace_linestart:
-	dec dh				; Jump back to end of previous line
-	mov dl, 79
-	call os_move_cursor
-
-	mov al, ' '			; Print space there
-	mov ah, 0Eh
-	int 10h
-
-	mov dl, 79			; And jump back before the space
-	call os_move_cursor
-
-	dec di				; Step back position in string
-	dec cx				; Step back counter
-
-	jmp .more
-
-
-.nobackspace:
-	pusha
-	mov ah, 0Eh			; Output entered, printable character
-	int 10h
-	popa
-
-	stosb				; Store character in designated buffer
-	inc cx				; Characters processed += 1
-	cmp cx, 254			; Make sure we don't exhaust buffer
-	jae near .done
-
-	jmp near .more			; Still room for more
-
-
-.done:
-	mov ax, 0
-	stosb
-
-	popa
-	ret
-
-
-
-; ==================================================================
-; ==================================================================
-; MikeOS -- The Mike Operating System kernel
-; Copyright (C) 2006 - 2014 MikeOS Developers -- see doc/LICENSE.TXT
-;
-; STRING MANIPULATION ROUTINES
-; ==================================================================
-
-; ------------------------------------------------------------------
-; os_string_length -- Return length of a string
-; IN: AX = string location
-; OUT AX = length (other regs preserved)
 
 os_string_length:
 	pusha
@@ -1712,177 +1559,27 @@ os_string_uppercase:
 	ret
 
 
-; ------------------------------------------------------------------
-; os_string_lowercase -- Convert zero-terminated string to lower case
-; IN/OUT: AX = string location
-
-os_string_lowercase:
-	pusha
-
-	mov si, ax			; Use SI to access string
-
-.more:
-	cmp byte [si], 0		; Zero-termination of string?
-	je .done			; If so, quit
-
-	cmp byte [si], 'A'		; In the upper case A to Z range?
-	jb .noatoz
-	cmp byte [si], 'Z'
-	ja .noatoz
-
-	add byte [si], 20h		; If so, convert input char to lower case
-
-	inc si
-	jmp .more
-
-.noatoz:
-	inc si
-	jmp .more
-
-.done:
-	popa
-	ret
-
 
 ; ------------------------------------------------------------------
 ; os_string_copy -- Copy one string into another
-; IN/OUT: SI = source, DI = destination (programmer ensure sufficient room)
+; IN: SI = source, DI = destination (programmer ensure sufficient room),
+; OUT: CX count until space or 0
 
 os_string_copy:
-	pusha
+	mov cx, 0
+	push si
 
 .more:
-	mov al, [si]			; Transfer contents (at least one byte terminator)
-	mov [di], al
-	inc si
-	inc di
+	lodsb
+	stosb
+	inc cx
+	cmp al, 32
+	je .done
 	cmp byte al, 0			; If source string is empty, quit out
 	jne .more
 
 .done:
-	popa
-	ret
-
-
-; ------------------------------------------------------------------
-; os_string_truncate -- Chop string down to specified number of characters
-; IN: SI = string location, AX = number of characters
-; OUT: String modified, registers preserved
-
-os_string_truncate:
-	pusha
-
-	add si, ax
-	mov byte [si], 0
-
-	popa
-	ret
-
-
-; ------------------------------------------------------------------
-; os_string_join -- Join two strings into a third string
-; IN/OUT: AX = string one, BX = string two, CX = destination string
-
-os_string_join:
-	pusha
-
-	mov si, ax			; Put first string into CX
-	mov di, cx
-	call os_string_copy
-
-	call os_string_length		; Get length of first string
-
-	add cx, ax			; Position at end of first string
-
-	mov si, bx			; Add second string onto it
-	mov di, cx
-	call os_string_copy
-
-	popa
-	ret
-
-
-; ------------------------------------------------------------------
-; os_string_chomp -- Strip leading and trailing spaces from a string
-; IN: AX = string location
-
-os_string_chomp:
-	pusha
-
-	mov dx, ax			; Save string location
-
-	mov di, ax			; Put location into DI
-	mov cx, 0			; Space counter
-
-.keepcounting:				; Get number of leading spaces into BX
-	cmp byte [di], ' '
-	jne .counted
-	inc cx
-	inc di
-	jmp .keepcounting
-
-.counted:
-	cmp cx, 0			; No leading spaces?
-	je .finished_copy
-
-	mov si, di			; Address of first non-space character
-	mov di, dx			; DI = original string start
-
-.keep_copying:
-	mov al, [si]			; Copy SI into DI
-	mov [di], al			; Including terminator
-	cmp al, 0
-	je .finished_copy
-	inc si
-	inc di
-	jmp .keep_copying
-
-.finished_copy:
-	mov ax, dx			; AX = original string start
-
-	call os_string_length
-	cmp ax, 0			; If empty or all blank, done, return 'null'
-	je .done
-
-	mov si, dx
-	add si, ax			; Move to end of string
-
-.more:
-	dec si
-	cmp byte [si], ' '
-	jne .done
-	mov byte [si], 0		; Fill end spaces with 0s
-	jmp .more			; (First 0 will be the string terminator)
-
-.done:
-	popa
-	ret
-
-
-; ------------------------------------------------------------------
-; os_string_strip -- Removes specified character from a string (max 255 chars)
-; IN: SI = string location, AL = character to remove
-
-os_string_strip:
-	pusha
-
-	mov di, si
-
-	mov bl, al			; Copy the char into BL since LODSB and STOSB use AL
-.nextchar:
-	lodsb
-	stosb
-	cmp al, 0			; Check if we reached the end of the string
-	je .finish			; If so, bail out
-	cmp al, bl			; Check to see if the character we read is the interesting char
-	jne .nextchar			; If not, skip to the next character
-
-.skip:					; If so, the fall through to here
-	dec di				; Decrement DI so we overwrite on the next pass
-	jmp .nextchar
-
-.finish:
-	popa
+	pop si
 	ret
 
 ; ------------------------------------------------------------------
@@ -1919,222 +1616,6 @@ os_string_compare:
 	stc				; Set carry flag
 	ret
 
-
-; ------------------------------------------------------------------
-; os_string_strincmp -- See if two strings match up to set number of chars
-; IN: SI = string one, DI = string two, CL = chars to check
-; OUT: carry set if same, clear if different
-
-os_string_strincmp:
-	pusha
-
-.more:
-	mov al, [si]			; Retrieve string contents
-	mov bl, [di]
-
-	cmp al, bl			; Compare characters at current location
-	jne .not_same
-
-	cmp al, 0			; End of first string? Must also be end of second
-	je .terminated
-
-	inc si
-	inc di
-
-	dec cl				; If we've lasted through our char count
-	cmp cl, 0			; Then the bits of the string match!
-	je .terminated
-
-	jmp .more
-
-
-.not_same:				; If unequal lengths with same beginning, the byte
-	popa				; comparison fails at shortest string terminator
-	clc				; Clear carry flag
-	ret
-
-
-.terminated:				; Both strings terminated at the same position
-	popa
-	stc				; Set carry flag
-	ret
-
-
-; ------------------------------------------------------------------
-; os_string_parse -- Take string (eg "run foo bar baz") and return
-; pointers to zero-terminated strings (eg AX = "run", BX = "foo" etc.)
-; IN: SI = string; OUT: AX, BX, CX, DX = individual strings
-
-os_string_parse:
-	push si
-
-	mov ax, si			; AX = start of first string
-
-	mov bx, 0			; By default, other strings start empty
-	mov cx, 0
-	mov dx, 0
-
-	push ax				; Save to retrieve at end
-
-.loop1:
-	lodsb				; Get a byte
-	cmp al, 0			; End of string?
-	je .finish
-	cmp al, [skibidi_two]			; A space?
-	jne .loop1
-	dec si
-	mov byte [si], 0		; If so, zero-terminate this bit of the string
-
-	inc si				; Store start of next string in BX
-	mov bx, si
-
-.loop2:					; Repeat the above for CX and DX...
-	lodsb
-	cmp al, 0
-	je .finish
-	cmp al, ' '
-	jne .loop2
-	dec si
-	mov byte [si], 0
-
-	inc si
-	mov cx, si
-
-.loop3:
-	lodsb
-	cmp al, 0
-	je .finish
-	cmp al, ' '
-	jne .loop3
-	dec si
-	mov byte [si], 0
-
-	inc si
-	mov dx, si
-
-.finish:
-	pop ax
-
-	pop si
-	ret
-skibidi_two db 0
-; Function: DecimalToHexString
-; Input:
-;   AX - 16-bit decimal value to convert
-;   SI - Pointer to memory where the resulting string will be stored
-; Output:
-;   AX - Pointer to the null-terminated string representation of the hex value
-; Clobbers:
-;   BX, CX, DX
-
-os_int_to_base16_string:
-    push si             ; Save SI (used for storing the string)
-    mov di, si          ; Use DI to write the string in reverse
-
-    xor cx, cx          ; CX will count the number of digits
-    xor dx, dx          ; Clear DX (used for remainders)
-
-.convert_loop:
-    xor dx, dx          ; Clear DX
-    mov bx, 16          ; Base 16
-    div bx              ; Divide AX by 16: AX = quotient, DX = remainder (digit)
-
-    ; Convert the remainder (digit in DX) to ASCII
-    add dl, '0'         ; Start by adding '0'
-    cmp dl, '9'         ; Check if it is greater than '9'
-    jbe .store_digit    ; If not, it is a numeric digit
-
-    add dl, 7           ; Convert to 'A'-'F' for hexadecimal letters
-
-.store_digit:
-    stosb               ; Store DL in memory at [DI] and advance DI
-    inc cx              ; Increment digit count
-    test ax, ax         ; Check if the quotient is 0
-    jnz .convert_loop   ; If not, continue the loop
-
-    ; Add null terminator
-    mov byte [di], 0    ; Null-terminate the string
-
-    ; Reverse the string in-place
-    sub di, cx          ; DI points to the last digit
-    mov si, di          ; SI points to the first digit
-    add si, cx          ; SI points to the null terminator
-
-.reverse_loop:
-    cmp si, di          ; Check if SI and DI overlap or cross
-    jbe .done_reversing ; If so, reversing is complete
-
-    ; Swap the characters
-    mov al, [di]        ; Load the digit at DI
-    mov bl, [si]        ; Load the digit at SI
-    mov [di], bl        ; Store BL at DI
-    mov [si], al        ; Store AL at SI
-
-    ; Adjust pointers
-    inc di              ; Move DI forward
-    dec si              ; Move SI backward
-    jmp .reverse_loop   ; Repeat the process
-
-.done_reversing:
-    mov ax, di          ; Return the pointer to the resulting string
-    pop si              ; Restore SI
-    ret
-
-
-; Function: HexStringToDecimal
-; Input:
-;   SI - Pointer to a null-terminated string of base-16 characters
-; Output:
-;   AX - Decimal equivalent of the input string
-; Clobbers: ;bro what?
-;   CX, DX, BX
-
-os_base16_string_to_int:
-    xor ax, ax          ; Clear AX (will store the result)
-    xor bx, bx          ; BX will be used to store the intermediate hex digit value
-
-.loop:
-    lodsb               ; Load the next character from SI into AL
-    or al, al           ; Check for null terminator
-    jz .done            ; If null terminator, we're done
-
-    ; Convert the ASCII character in AL to a hex value in BX
-    cmp al, '0'
-    jl .invalid         ; If less than '0', invalid character
-    cmp al, '9'
-    jg .check_alpha     ; If greater than '9', check for A-F/a-f range
-    sub al, '0'         ; Convert '0'-'9' to 0-9
-    jmp .store_digit
-
-.check_alpha:
-    cmp al, 'A'
-    jl .invalid         ; If less than 'A', invalid character
-    cmp al, 'F'
-    jg .check_lowercase ; If greater than 'F', check for lowercase
-    sub al, 'A'         ; Convert 'A'-'F' to 10-15
-    add al, 10
-    jmp .store_digit
-
-.check_lowercase:
-    cmp al, 'a'
-    jl .invalid         ; If less than 'a', invalid character
-    cmp al, 'f'
-    jg .invalid         ; If greater than 'f', invalid character
-    sub al, 'a'         ; Convert 'a'-'f' to 10-15
-    add al, 10
-
-.store_digit:
-    movzx bx, al        ; Move the converted digit into BX
-    shl ax, 4           ; Multiply the current result in AX by 16
-    add ax, bx          ; Add the digit to AX
-    jmp .loop           ; Continue with the next character
-
-.invalid:
-    xor ax, ax          ; Return 0 if invalid input
-    ret
-
-.done:
-    ret
 
 
 ; ------------------------------------------------------------------

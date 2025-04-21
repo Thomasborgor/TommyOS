@@ -31,7 +31,7 @@ print_time:
 	call print_bcd
 	
 	mov si, backspace_msg
-	call print
+	call os_print_string
 	jmp second
 	
 print_date:
@@ -50,7 +50,7 @@ print_date:
     mov al, cl
     call print_bcd
 	mov si, backspace_msg
-	call print
+	call os_print_string
     jmp second
 	
 clear:
