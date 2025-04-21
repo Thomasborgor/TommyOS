@@ -58,7 +58,8 @@ mov cx, 43008			; Load file ?? after program start
 	mov dh, 1			; Move cursor to near top
 	mov dl, 0
 	mov bh, [current_page]
-	call os_move_cursor
+	mov ax, 0x1003
+	int 0x10
 
 	popa
 

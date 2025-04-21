@@ -3,6 +3,8 @@
 mov [bootdev], dl
 mov [SecsPerTrack], ax
 mov [Sides], bx
+cmp byte [si], 255
+je no_filename
 mov ah, 0x00     ; BIOS video service
 mov al, 0x13     ; Video mode 13h (320x200, 256 colors)
 int 0x10         ; BIOS interrupt for video services
@@ -26,7 +28,11 @@ mov es, ax
 mov ax, filename_buf2
 call os_remove_file
 jmp after_the_thingy
-
+no_filename: 
+mov si, no_file_name
+call os_print_string
+ret
+no_file_name db 'No input file specified.', 0
 
 afterdjdjdj:
 mov ah, 0x00     ;This might seem weird, but it is correct because if there is no existing file, it prints rando data and we just clear that out!
@@ -83,9 +89,12 @@ start:
 main_loop:
     ; Wait for a keypress
 	inc byte [color]
+	cmp byte [color], 0x10
+	je no_black
 	drawing_dot:
 	call draw_dot
 	dec byte [color]
+	thingasdasdasd:
 	xor ah, ah
 	int 0x16
     cmp ah, 0x48     ; Check if Up arrow (0x48)
@@ -110,7 +119,12 @@ main_loop:
 	
     jmp main_loop    ; Loop back to wait for another keypress
 	
-
+no_black:
+	sub byte [color], 2
+	call draw_dot
+	inc byte [color]
+	jmp thingasdasdasd ;i was bored okay
+	
 save_file_pcx:
 	;right now I just need to test something
 	call draw_dot
