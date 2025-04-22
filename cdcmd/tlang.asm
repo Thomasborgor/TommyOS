@@ -59,6 +59,7 @@ test_loop: ;nice little debug mode that I made to test stuff
 	mov di, ax
 	call print
 	
+	
 	mov ah, 0
 	int 0x16
 	mov di, enter_msg
@@ -110,10 +111,6 @@ test_start:
 	mov byte [char5], 0
 	call get_cmd
 	
-	;mov di, cmd_buf
-	;call print
-	;mov ah, 00
-	;int 16h
 	
 	mov di, prt_str
 	call test_string
@@ -386,7 +383,7 @@ def_string_found:
 	call prep_si
 	mov byte [char4], 1
 	call get_cmd
-
+	
 	mov di, str1_str
 	mov byte [char4], 1
 	call test_string
@@ -395,9 +392,12 @@ def_string_found:
 	mov byte [char4], 1
 	call test_string
 	je reset_str2_offset
-	sub word [offset_counter], 5
+	mov ax, [tmp_cx]
+	sub ax, 3
+	sub word [offset_counter], ax  ;this has to be dynamically changed based on the amount of chars that the get_cmd's found in the last runs.
 	call prep_si
 	call get_cmd
+
 	
 	cmp byte [varcount], 30 ;checks if we are at 30 user vars
 	jge halt
@@ -425,13 +425,12 @@ def_string_found:
 		add di, [placeholder]
 		mov si, cmd_buf
 		mov cl, [placeholder2]
+		inc cl
 		xor ch, ch
 		store_it_loop:
 		lodsb
 		stosb
 		loop store_it_loop
-		lodsb
-		stosb
 		
 		done_storing:
 		cmp byte [placeholder2], 1
@@ -453,13 +452,14 @@ def_string_found:
 		xor bh, bh
 		mov ax, 0
 		call write_word_user_var
-		
+	
 		inc byte [varcount]
 		sub word [offset_counter], 1
 		jmp inc_and_rerun_two
 	reset_str1_offset:
 		mov word [str1_offset], 00
 		sub word [offset_counter], 2
+		
 		jmp inc_and_rerun_two
 	reset_str2_offset:
 		mov word [str2_offset], 00
@@ -1145,8 +1145,9 @@ mov_string_found:
 	mov byte [char4], 1
 	call test_string
 	je str2_mov_first
-	
-	sub word [offset_counter], 5
+	mov ax, [tmp_cx]
+	sub ax, 3
+	sub word [offset_counter], ax
 	call prep_si
 	call get_cmd
 	
@@ -1165,6 +1166,9 @@ mov_string_found:
 	mov byte [char4], 1
 	call get_cmd
 	
+
+	
+	
 	mov di, str1_str
 	mov byte [char4], 1
 	call test_string
@@ -1175,9 +1179,13 @@ mov_string_found:
 	call test_string
 	je str2_mov_second
 	
-	sub word [offset_counter], 5
+	mov ax, [tmp_cx]
+	sub ax, 3
+	sub word [offset_counter], ax
 	call prep_si
 	call get_cmd
+	
+	
 	
 	mov di, xxx_str
 	call test_string
@@ -1426,6 +1434,7 @@ special_first:
 
 get_cmd:
 	clc
+	mov word [tmp_cx], 0
 	mov di, cmd_buf
 	mov al, 0
 	mov cx, 6
@@ -1444,6 +1453,7 @@ get_cmd:
 
 	lodsb_loop:
 		lodsb
+		inc word [tmp_cx] ;new counter
 		inc word [offset_counter]
 		cmp al, ' '
 		je done_get_cmd
@@ -1601,6 +1611,10 @@ clear_but_ret:
 
     popa
 	ret
+	
+special_bum_thingy:
+	dec word [offset_counter]
+	jmp this_thingy_2
 
 find_user_var_return:
 	clc
@@ -1610,14 +1624,23 @@ find_user_var_return:
 	
 	mov ax, cmd_buf
 	call os_string_length
+	
 	mov di, cmd_buf
+	cmp ax, 2
+	je special_bum_thingy
 	cmp ax, 3
 	je this_thingy
+	this_thingy_2:
 	add di, ax
-	mov byte [di], ' '
+	mov cx, 3
+	sub cx, ax
+	sub word [offset_counter], cx
+	inc word [offset_counter]
+	mov al, ' '
+	rep stosb
 	mov [tmp_cx], ax ;temporary saves the length
 	this_thingy:
-	mov di, cmd_buf
+
 	mov si, varnames
 	mov byte [find_var], 0
 
@@ -1672,7 +1695,7 @@ write_word_user_var:
 	
 write_and_return:
 	call write_word_user_var
-	sub word [offset_counter], 2
+	sub word [offset_counter], 3
 	call prep_si
 	jmp inc_and_rerun_two
 	
@@ -1781,8 +1804,7 @@ tmp_cx dw 0
 placeholder dw 0
 placeholder2 db 0
 prompt db '> ', 0
-dirlist times 1024 db 0
-file_thingy db 10, 13, '.TOM file to run: ', 0
+
 input_string_thing db 'String: ', 0
 filename_buf times 12 db 0
 %include "./cdcmd/basicfunctions.asm"
@@ -1792,3 +1814,5 @@ end_of_file dw 0
 ;just kidding its 1614
 ;just kidding x2 its 1706
 ;just kidding x3 its 1767
+;just kidding x4 its 1795
+dirlist:

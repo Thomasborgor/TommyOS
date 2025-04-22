@@ -31,6 +31,7 @@ not:
 	mcopy -i floppy.img ./guessnum.tom ::number.TOM
 	mcopy -i floppy.img ./cdcmd/haha.bin ::format.bin
 	mcopy -i floppy.img ./cdcmd/paint.bin ::PAINT.BIN
+	mcopy -i floppy.img ./def.tom ::DEF.TOM
 	clear
 	
 commit:
