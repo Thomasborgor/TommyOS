@@ -214,102 +214,67 @@ clear_page:
 	call clear
 	jmp check_cursor
 
-	
-write_file:
-
-
-
-xor dx, dx
-mov bh, 7
-mov ah, 2
-int 0x10
-mov byte [current_page], 7
-mov byte [final_page], 7
-mov ah, 5
-mov al, 7
-int 0x10
-
-check_loop3:
-	xor dx, dx
-	mov bh, [current_page]
-	mov ah, 2
-	int 0x10
-	call check_space_vert
-	jnc inc_final_page
-	jmp done_checking
-	
-inc_final_page:
-	dec byte [current_page]
-	dec byte [final_page]
-	mov ah, 5
-	mov al, [final_page]
-	int 0x10
-	jmp check_loop3
-
-done_checking:
-mov ah, 5
-mov al, 0;set first page
-int 0x10
-mov byte [current_page], 0
-mov ah, 2
-mov bh, 00h
-mov dx, 0x0100
-int 0x10
-
-lea di, [write_buffer] ; Load address of write_buffer into DI
-
-start_checking:
-    ;mov ax, 00h
-    ;int 16h
-    ;we have already check that the pages after this one is blank.
-    ;we have set the page to the first one.
-
-    mov ah, 0x08          ; Read character at cursor position
-    mov bh, [current_page]
-    int 0x10
-    stosb                 ; Store character into write_buffer
-
-    mov ah, 0x03          ; Get current cursor position
-    mov bh, [current_page]
-    int 0x10
-
-    mov ah, 0x02          ; Move cursor to the right
-    mov bh, [current_page]
-    inc dl
-    int 0x10
-
-    call check_all_space
-    jc start_checking      ; Skip row if it contains only spaces
-
-    mov ah, 0x03          ; Get current cursor position again
-    mov bh, [current_page]
-    int 0x10
-
-    cmp dh, 24            ; Check if we're at the last row
-    jne start_checking
-    call check_all_space
-    jnc end               ; End processing if all rows are checked
-	
-	special_loop:
-		mov ah, 0x08
-		mov bh, [current_page]
-		int 0x10
-		stosb
-		 mov ah, 0x03          ; Get current cursor position
-		mov bh, [current_page]
-		int 0x10
-
-		mov ah, 0x02          ; Move cursor to the right
-		mov bh, [current_page]
-		inc dl
-		int 0x10
-		call check_all_space
-		jnc inc_page
-		jmp special_loop
-	
+check_spaces:
+	clc
+	cld
+	push si
+	mov ax, si
+	mov dx, 0
+	mov cx, 160
+	div cx
+	;dx is our remainder, which basically means how many spaces we are from the left side of the screen.
+	;we sub this from 160 to get our cx loop.
+	mov cx, 80
+	sub cx, dx
+	dec si
+	check_everything:
+		inc si
+		lodsb
+		cmp al, 32
+		jne bad_line
+		loop check_everything
+		mov ax, si
+		pop si
+		mov cx, 160
+		mov si, ax
+		xor dx, dx
+		div cx
+		add si, dx
+		inc si
+		mov word [di], 0x0a0d
+		add di, 2
+		clc
+		ret
+	bad_line:
+		pop si
+		stc
+		ret
 		
 
-end:
+write_file:
+	mov ax, 0xb800
+	mov ds, ax
+	mov di, write_buffer
+	;we'll just start with one page for now
+	mov si, 160
+	get_entire_page:
+		cmp si, 4000
+		jge done_getting_page
+		call check_spaces ;carry bit set if stuff, not if none
+		jnc get_entire_page
+		lodsb
+		stosb
+		inc si
+		jmp get_entire_page
+	
+	done_getting_page:
+	
+	mov [di], byte 0
+	
+	mov ax, 0x2000
+	mov ds, ax
+
+		
     mov ax, test_txt    ; Placeholder commands
     call os_remove_file
 
@@ -320,137 +285,12 @@ end:
     mov ax, test_txt
     mov bx, write_buffer
     call os_write_file
-	jc error
-	mov ax, 0x0500
-	mov byte  [current_page], 0
-	clear_all_pages:
-		int 0x10
-		call clear
-		inc byte [current_page]
-		inc al
-		cmp al, 7
-		jng clear_all_pages
-    mov ah, 5             ; Ignore placeholder commands
-    mov al, 0
-    int 0x10
-    xor dx, dx
-    mov ah, 2
-    mov bh, 0
-    int 0x10
-    call clear
-
-    mov si, welcome
-    call print
-
-    ret
-error:
-	mov ax, 0x0e41
-	int 0x10
+	call clear
 	ret
 	
-inc_page:
-	inc byte [current_page]
-	mov ah, 5
-	mov al, [current_page]
-	int 0x10
-	xor dx, dx
-	mov bh, [current_page]
-	mov ah, 2
-	int 0x10
-	jmp start_checking
-
-reset_screen: ;ign
-    mov ah, 5
-    mov al, 00h
-    mov [current_page], al
-    int 0x10
-    mov ax, 0x0e01
-    int 0x10
-    jmp $
-
-do_the_space_check:
-    call check_all_space
-    jnc start_checking
-
-    mov byte [di], 32
-    inc di
-    jmp start_checking
-
-check_space_vert:
-    pusha
-    mov bl, 25
-    sub bl, dh
-    xor bh, bh
-    mov cx, bx
-check_loop2:
-    call check_all_space
-    jc failed_all_space
-    mov ah, 0x08
-    mov bh, [current_page]
-    int 0x10
-    cmp al, ' '
-    jne failed_all_space
-    mov ah, 0x02
-    mov bh, [current_page]
-    int 0x10
-    inc dh
-    loop check_loop2
-    inc byte [current_page]
-    popa
-    clc
-    ret
-
-check_all_space:
-	mov ah, 0x03
-	mov bh, [current_page]
-	int 0x10
-	mov [temp_dl], dl
-	
-    pusha
-    mov bl, 79            ; Number of columns in a row
-    sub bl, dl
-    xor bh, bh
-    mov cx, bx
-check_loop:
-    mov ah, 0x08          ; Read character at cursor position
-    mov bh, [current_page]
-    int 0x10
-    cmp al, ' '           ; Compare to space
-    jne failed_all_space  ; If non-space character found, exit
-    mov ah, 0x02          ; Move cursor to the right
-    mov bh, [current_page]
-    int 0x10
-    inc dl
-    loop check_loop
-    popa
-
-    ; If all spaces, proceed to the next line
-    mov ah, 0x02
-    mov bh, [current_page]
-    mov dl, 0
-    inc dh
-    int 0x10
-    mov byte [di], 10     ; Add newline to write_buffer
-    inc di
-    mov byte [di], 13     ; Add carriage return to write_buffer
-    inc di
-    clc                   ; Clear carry flag (indicate success)
-    ret
-failed_all_space:
-    popa
-    stc                   ; Set carry flag (indicate failure)
-	mov ah, 0x03
-	mov bh, [current_page]
-	int 0x10
-	mov ah, 0x02
-	mov bh, [current_page]
-	mov dl, [temp_dl]
-	int 0x10
-    ret
-
-
 
 temp_dl db 0
+temp_dh db 0
 
 block_keys:
 	; Only allow arrow keys when at bottom-right

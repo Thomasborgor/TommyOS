@@ -1,0 +1,5 @@
+def hi
+def ai
+mov 123 hi
+mov hi ai
+prt ai
