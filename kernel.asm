@@ -273,7 +273,7 @@ parse: ;how we are going to do this:
 boot_pcx db 'BOOT.PCX', 0
 found_custom_boot:
 	call os_print_pcx
-	mov bx, 00
+	mov bx, 100
 	call delay
 	mov ax, 3			; Back to text mode
 	mov bx, 0
