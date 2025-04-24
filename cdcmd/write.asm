@@ -214,99 +214,106 @@ check_cursor:
 clear_page:
 	call clear
 	jmp check_cursor
-
-
+	
 write_file:
+mov ax, 0xb800
+    mov es, ax
     mov ax, cs
     mov ds, ax
+	mov byte [temp_dh], 0
 
-    xor bp, bp                    ; BP = write_buffer index
-    mov byte [temp_dh], 0
+    xor di, di
+    mov di, write_buffer
+    xor cx, cx
 
-next_page:
-    movzx cx, byte [temp_dh]
-    cmp cx, 8
-    jge remove_trailing_crlfs
-
-    mov ax, 0xB800
-    add ax, cx
-    mov es, ax
-
-    xor dx, dx                    ; screen row offset
-    mov bx, 25                    ; row counter
-
+   
+    mov dx, 160
+	mov bx, 24          ; row counter
 read_row:
     push bx
-
-    mov si, dx                    ; SI = screen row offset
+    mov si, dx          ; SI = dx = row offset in screen memory (ES:SI)
     mov cx, 80
-    mov di, buffer_buffer         ; DI = temp buffer pointer
+    mov bx, buffer_buffer
 
 read_chars:
     mov al, [es:si]
-    mov [di], al
+    mov [bx], al
     add si, 2
-    inc di
+    inc bx
     loop read_chars
 
     ; Trim trailing spaces
-    dec di
+    dec bx
 trim_spaces:
-    cmp byte [di], ' '
+    cmp byte [bx], ' '
     jne insert_crlf
-    dec di
-    cmp di, buffer_buffer
+    dec bx
+    cmp bx, buffer_buffer
     jge trim_spaces
 
 insert_crlf:
-    inc di
-    mov byte [di], 0x0D
-    inc di
-    mov byte [di], 0x0A
-    inc di
+    inc bx
+    mov byte [bx], 0x0D
+    inc bx
+    mov byte [bx], 0x0A
+    inc bx
 
-    ; Copy line to write_buffer using BP
+    ; Append buffer_buffer to write_buffer
     mov si, buffer_buffer
 copy_line:
     mov al, [si]
-    mov [write_buffer + bp], al
+    mov [di], al
     inc si
-    inc bp
+    inc di
     cmp al, 0x0A
     jne copy_line
 
     pop bx
-    add dx, 160
-    dec bx
+    add dx, 160         ; move to next row
+    dec bx ;here we will put code to change pages! ;all we should have to do is change
     jnz read_row
+	inc byte [temp_dh]
+	mov ch, 0
+	mov cl, [temp_dh]
+	mov ax, 0xb800
+	do_the_thing:
+		add ax, 0x100
+		loop do_the_thing
+	mov es, ax
+	cmp byte [temp_dh], 7
+	mov bx, 25
+	mov dx, 0
+	jle read_row
+	
+	remove_trailing_crlfs:
+    cmp di, write_buffer
+    jbe no_crlf_trim       ; if nothing was written, skip
 
-    ; next page
-    inc byte [temp_dh]
-    jmp next_page
+    dec di
+    cmp byte [di], 0x0A
+    jne no_crlf_trim
+    dec di
+    cmp byte [di], 0x0D
+    jne no_crlf_trim
 
-remove_trailing_crlfs:
-    cmp bp, 0
-    jbe no_trim
+    ; found CRLF at end, remove and check again
+    jmp remove_trailing_crlfs
 
-trim_crlf:
-    dec bp
-    cmp byte [write_buffer + bp], 0x0A
-    jne no_trim
-    dec bp
-    cmp byte [write_buffer + bp], 0x0D
-    jne no_trim
-    jmp trim_crlf
-
-no_trim:
-    inc bp
-    mov byte [write_buffer + bp], 0
-   
+no_crlf_trim:
+    inc di                 ; move to where we want the null terminator
+    mov byte [di], 0 
 	
 	mov ax, 0x2000
 	mov ds, ax
+	mov byte [current_page], 0
+	mov cx, 7
+	clear_loop:
+		call clear
+		inc byte [current_page]
+		loop clear_loop
 	mov ax, 0x0500
 	int 0x10
-	call clear
+
     mov ax, test_txt    ; Placeholder commands
     call os_remove_file
 
