@@ -1,35 +1,67 @@
 
-bits 16
+[BITS 16]
 
-cli				; Clear interrupts
-	mov ax, 0
-	mov ss, ax			; Set stack segment and pointer
-	mov sp, 2000h
-	mov bp, 0
-	sti				; Restore interrupts
+cli
+mov ax, 0
+mov ss, ax
+mov sp, 2000h
+mov bp, 0
+sti
 
-	cld				; The default direction for string operations
-					; will be 'up' - incrementing address in RAM
+cld
 
-	mov ax, 2000h			; Set all segments to match where kernel is loaded
-	mov ds, ax			; After this, we don't need to bother with
-	mov es, ax			; segments ever again, as TommyOS and its programs
-	mov fs, ax
-	mov gs, ax
-	
-	start2:
-	mov [bootdev], dl
-	push es
-	mov ah, 8			; Get drive parameters
-	int 13h
-	pop es
-	and cx, 3Fh			; Maximum sector number
-	mov [SecsPerTrack], cx		; Sector numbers start at 1
-	movzx dx, dh			; Maximum head number
-	add dx, 1			; Head numbers start at 0 - add 1 for total
-	mov [Sides], dx
+mov ax, 2000h
+mov ds, ax
+mov es, ax
+mov fs, ax
+mov gs, ax
+
+start2:
+mov [bootdev], dl
+push es
+mov ah, 8
+int 13h
+pop es
+and cx, 3Fh
+mov [SecsPerTrack], cx
+movzx dx, dh
+add dx, 1
+mov [Sides], dx
+
+; --- Unreal Mode switch inserted after FAT12 reading (you should move it properly after file loading) ---
+cli
+lgdt [gdt_descriptor]
+
+mov eax, cr0
+or eax, 1
+mov cr0, eax
+
+
+and eax, 0xFFFFFFFE
+mov cr0, eax
+
+sti
+
+jmp no_change
+
+; Now you are in Unreal Mode!
+; Continue your kernel execution normally...
+
+; --- GDT Table ---
+gdt_start:
+    dq 0x0000000000000000
+    dq 0x00CF9A000000FFFF
+    dq 0x00CF92000000FFFF
+
+gdt_descriptor:
+    dw gdt_end - gdt_start - 1
+    dd gdt_start
+gdt_end:
+
+
 
 no_change:
+	
 	mov ax, 1003h			; Set text output with certain attributes
 	mov bx, 0			; to be bright, and not blinking
 	int 10h
@@ -786,6 +818,7 @@ skiplines dw 0
 %include "./extra/functions.asm"
 %include "./extra/old_funcs.asm"
 disk_buffer equ 24576
+
 dirlist:
 sector_buffer:
 buffer:
