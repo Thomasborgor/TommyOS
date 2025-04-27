@@ -335,8 +335,8 @@ l2hts:			; Calculate head, track and sector settings for int 13h
 
 	kern_filename	db "KERNEL  BIN"	; MikeOS kernel filename
 
-	disk_error	db "Bad flop", 0
-	file_not_found	db "No kernel", 0
+	disk_error	db "F", 0
+	file_not_found	db "K", 0
 
 	bootdev		db 0 	; Boot device number
 	cluster		dw 0 	; Cluster of the file we want to load

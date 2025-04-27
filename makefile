@@ -10,6 +10,7 @@ not:
 	nasm -fbin ./cdcmd/haha.asm -o ./cdcmd/haha.bin
 	nasm -fbin ./cdcmd/line.asm -o ./cdcmd/line.bin
 	nasm -fbin ./cdcmd/paint.asm -o ./cdcmd/paint.bin
+	nasm -fbin ./cdcmd/32.asm -o ./cdcmd/32.bin
 
 	@echo "Creating Preloaded Images..."
 	#bmp-pcx ./extra/sample.bmp ./extra/logo.pcx
@@ -32,6 +33,7 @@ not:
 	mcopy -i floppy.img ./cdcmd/haha.bin ::format.bin
 	mcopy -i floppy.img ./cdcmd/paint.bin ::PAINT.BIN
 	mcopy -i floppy.img ./def.tom ::DEF.TOM
+	mcopy -i floppy.img ./cdcmd/32.bin ::32.BIN
 	clear
 	
 commit:

@@ -1,5 +1,12 @@
-def hi
-def ai
-mov 123 hi
-mov hi ai
-prt ai
+prt "TommyOS LOCK"
+inc yyy
+prt "very secure"
+inc yyy
+mov "tt749310" str1
+ask str2
+cmpsr
+jye 012
+prt "Incorrect!"
+inc yyy
+jmp 006
+prt "Correct!"

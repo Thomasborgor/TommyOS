@@ -110,7 +110,7 @@ test_start:
 	call prep_si
 	mov byte [char5], 0
 	call get_cmd
-	
+
 	
 	mov di, prt_str
 	call test_string
@@ -148,9 +148,6 @@ test_start:
 	call test_string
 	je bel_string_found
 	
-	mov di, rem_str
-	call test_string
-	je inc_and_rerun_two ;record few lines of code for a command
 	
 	cmp byte [di], ';'
 	je inc_and_rerun_two
@@ -467,14 +464,15 @@ def_string_found:
 		jmp inc_and_rerun_two
 	
 ask_string_found:
-	mov al, 0
-	mov cx, 59
-	mov di, str1_str_string
-	repe stosb
-	mov al, 0
-	mov cx, 59
-	mov di, str2_str_string
-	repe stosb
+	;mov al, 0
+	;mov cx, 59
+	;mov di, str1_str_string
+	;repe stosb
+	;mov al, 0
+	;mov cx, 59
+	;mov di, str2_str_string
+	;repe stosb ;GENIUS MOVE UP HERE.
+	;Not like we will need ANY strings once we want another, right?
 	
 	call prep_si
 	mov byte [char4], 1
@@ -632,12 +630,13 @@ jne_string_found:
 	jmp inc_and_rerun_two
 
 jye_string_found:
+	
 	cmp byte [strings_equal], 1
 	je jmp_string_found
 	
 	cmp byte [jye_flag], 1
 	je jmp_string_found
-	
+
 	jmp inc_and_rerun_two
 	
 jls_string_found:
@@ -646,9 +645,11 @@ jls_string_found:
 	jmp jmp_string_found
 	
 jmp_string_found:
+	
 	mov byte [jmp_counter], 1
 	call prep_si
 	call get_cmd
+	
 	
 	mov si, cmd_buf
 	call os_string_to_int
@@ -663,7 +664,6 @@ jmp_string_found:
 	call go_to_first_line
 	repeat_jmp:
 	
-	add word [offset_counter], 2
 	call prep_si
 	call find_next_line
 
@@ -673,9 +673,11 @@ jmp_string_found:
 	
 	jl repeat_jmp
 	
+	
+	
 	mov byte [jye_flag], 0
-	mov byte [jne_flag], 00
-	mov byte [jls_flag], 00
+	mov byte [jne_flag], 0
+	mov byte [jls_flag], 0
 	mov byte [jgr_flag], 0
 	
 	jmp test_start
@@ -1023,13 +1025,13 @@ add_string_found:
 	call prep_si
 	call get_cmd
 	
-	
 	mov di, cmd_buf
 	call find_user_var_return
 	jnc add_user_var_before
 	
 	mov si, cmd_buf
 	call os_string_to_int
+	
 	
 	mov word [placeholder], ax
 	mov byte [placeholder2], al
@@ -1154,8 +1156,13 @@ mov_string_found:
 	call find_user_var_return
 	jnc mov_user_var_before
 	
-	;must be a number
+	;must be a number, well, until I tried to make a lock program.
+	;Now, we just have to do one more tiny little check to see if there is a "
+	;which means to save a string to a string, you know?
+	
 	mov si, cmd_buf
+	cmp byte [si], '"'
+	je found_quotes
 	call os_string_to_int
 	mov [placeholder], ax
 	mov [placeholder2], al
@@ -1198,6 +1205,62 @@ mov_string_found:
 	call find_user_var_return
 	jnc mov_user_var_second
 	jmp syntax_error_halt
+	
+	found_quotes:
+		call prep_si
+		sub si, 3 ;we were at the "
+		sub word [offset_counter], 3
+		mov di, prt_string
+		save_loop:
+			lodsb
+			inc word [offset_counter]
+			stosb
+			cmp al, '"'
+			jne save_loop
+			mov byte [di-1], 0
+			inc word [offset_counter]
+			
+			mov byte [char4], 1
+			call prep_si
+			call get_cmd
+			
+			
+			mov di, str1_str
+			mov byte [char4], 1
+			call test_string
+			je copy_to_str1
+			
+			mov di, str2_str
+			mov byte [char4], 1
+			call test_string
+			je copy_to_str2
+			
+			jmp syntax_error_halt
+			
+	copy_to_str1:
+		mov si, prt_string
+		mov di, str1_str_string
+		jmp save_loop3
+		
+		copy_to_str2:
+
+		mov si, prt_string
+		mov di, str2_str_string
+		
+		save_loop3:
+			lodsb
+			cmp al, 0
+			je done_storing1
+			stosb
+			jmp save_loop3
+		done_storing1:
+		mov byte [di], 0
+		
+		sub word [offset_counter], 2
+		jmp inc_and_rerun_two
+			
+			
+			
 	
 	str1_mov_first:
 		mov di, str1_str_string
@@ -1464,7 +1527,7 @@ get_cmd:
 		stosb
 		loop lodsb_loop
 		done_get_cmd:
-		mov byte [di], 0
+		mov byte [di+1], 0
 		pop cx
 		inc word [offset_counter]
 		inc si
