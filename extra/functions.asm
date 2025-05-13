@@ -11,7 +11,7 @@
 
 os_get_file_list:
 	pusha
-
+	mov word [dirlist], 0
 	mov word [.file_list_tmp], ax
 
 	mov eax, 0			; Needed for some older BIOSes
@@ -49,9 +49,11 @@ os_get_file_list:
 
 	mov ax, 0
 	mov si, disk_buffer		; Data reader from start of filenames
+	
+	cmp byte [si+11], 08h
+	je .do_the_volume_label
 
 	mov word di, [.file_list_tmp]	; Name destination buffer
-
 
 .start_entry:
 	mov al, [si+11]			; File attributes for entry
@@ -59,7 +61,7 @@ os_get_file_list:
 	je .skip
 
 	test al, 18h			; Is this a directory entry or volume label?
-	jnz .skip			; Yes, ignore it
+	jnz .skip		; Yes, ignore it
 
 	mov al, [si]
 	cmp al, 229			; If we read 229 = deleted filename
@@ -127,6 +129,18 @@ os_get_file_list:
 	add si, 32			; Shift to next 32 bytes (next filename)
 	jmp .start_entry
 
+.do_the_volume_label:
+	mov cx, 11
+	mov di, .volumenamebuffer
+	.loppy:
+		lodsb
+		stosb
+		loop .loppy
+	mov word di, [.file_list_tmp]
+	mov byte [di], ','
+	add si, 21
+	jmp .start_entry
+	
 
 .done:
 	dec di
@@ -137,7 +151,7 @@ os_get_file_list:
 
 
 	.file_list_tmp		dw 0
-
+.volumenamebuffer times 12 db 0
 
 ; ------------------------------------------------------------------
 ; os_load_file -- Load file into RAM
@@ -1754,12 +1768,19 @@ os_fatal_error:
 
 
 list_directory:
+	
 	call os_print_newline
 	mov cx,	0			; Counter
 
 	mov ax, dirlist			; Get list of files on disk
 	call os_get_file_list
-
+	
+	mov si, volumeof
+	call os_print_string
+	mov si, os_get_file_list.volumenamebuffer
+	call os_print_string
+	call os_print_newline
+	
 	mov si, dirlist
 	mov ah, 0Eh			; BIOS teletype function
 
@@ -1786,7 +1807,7 @@ list_directory:
 done2:
 	ret
 	
-
+volumeof db 'Dir of ', 0
 	
 os_bcd_to_int:
 	pusha

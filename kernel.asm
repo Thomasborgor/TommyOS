@@ -16,7 +16,9 @@ mov es, ax
 mov fs, ax
 mov gs, ax
 
+
 start2:
+
 mov [bootdev], dl
 push es
 mov ah, 8
@@ -27,40 +29,8 @@ mov [SecsPerTrack], cx
 movzx dx, dh
 add dx, 1
 mov [Sides], dx
-
-; --- Unreal Mode switch inserted after FAT12 reading (you should move it properly after file loading) ---
-cli
-lgdt [gdt_descriptor]
-
-mov eax, cr0
-or eax, 1
-mov cr0, eax
-
-
-and eax, 0xFFFFFFFE
-mov cr0, eax
-
-sti
-
-jmp no_change
-
-; Now you are in Unreal Mode!
-; Continue your kernel execution normally...
-
-; --- GDT Table ---
-gdt_start:
-    dq 0x0000000000000000
-    dq 0x00CF9A000000FFFF
-    dq 0x00CF92000000FFFF
-
-gdt_descriptor:
-    dw gdt_end - gdt_start - 1
-    dd gdt_start
-gdt_end:
-
-
-
-no_change:
+	
+	no_change:
 	
 	mov ax, 1003h			; Set text output with certain attributes
 	mov bx, 0			; to be bright, and not blinking
@@ -119,10 +89,9 @@ main:
 	xor ax, ax
 	mov si, kernel_ver
 	call os_print_string
+	
 	second:
-		mov ah, 5
-		mov al, 0
-		int 0x10
+
 		mov si, prompt
 		call os_print_string
 		mov cx, 40
@@ -141,10 +110,7 @@ main:
 		mov cx, 60
 		mov al, 0
 		mov di, input_buffer_copy_copy
-		rep stosb
-		
-		
-		
+		rep stosb		
 		lea di, [input_buffer]
 		mov word [tmp_one], 0
 		input_loop:
@@ -161,7 +127,7 @@ main:
 		mov ah, 0x0e
 		int 0x10
 		inc word [tmp_one]
-		cmp word [tmp_one], 60
+		cmp word [tmp_one], 400
 		jne input_loop
 		jmp parse
 backspace:
@@ -269,6 +235,14 @@ parse: ;how we are going to do this:
 	call compare_string
 	jc echo_do
 	
+	mov di, hexsave
+	call compare_string
+	jc hexsave_do
+	
+	mov di, volumename
+	call compare_string
+	jc new_name
+	
 	;get the input, go to uppercase, figure out the length, 8-length is the number of spaces we need to pad, then add BIN to the end. 
 
 	
@@ -301,6 +275,153 @@ parse: ;how we are going to do this:
 	mov si, unkown_command
 	call os_print_string
 	jmp second
+	
+new_name:
+	mov si, input_buffer
+	add si, 5
+	mov cx, 11
+	mov di, sector_buffer
+	get_nasdasdasdasd:
+		lodsb
+		cmp al, 0
+		je done_thingasdasd
+		stosb
+		loop get_nasdasdasdasd
+	done_thingasdasd:
+		mov al, 32
+		repe stosb ;EFFICIENCY
+		mov byte [di], 8
+	
+	mov ax, 19
+	call disk_convert_l2hts
+	mov ax, 0x020d
+	mov bx, buffer ;buffer holds the buffer, sector_buffer holds literally just the volume name
+	int 13h
+	jc failed
+	
+	mov byte [di], 8
+	mov ax, 19
+	call disk_convert_l2hts
+	mov ax, 0x030d
+	mov bx, sector_buffer
+	int 13h
+	jc failed
+	
+	jmp second
+	
+hexsave_do:
+	mov si, input_buffer
+	add si, 8
+	mov di, input_buffer_copy
+
+	get_filename:
+		lodsb
+		cmp al, 32
+		je done_getting
+		cmp al, 0
+		je unknown_command_place
+		stosb
+		jmp get_filename
+	
+	done_getting:
+	mov ax, input_buffer_copy
+	call os_file_exists
+	jnc the_file_exists
+	mov si, input_buffer
+	add si, 8
+	mov di, buffer
+	call hex_to_bin
+	mov ax, si
+	call os_remove_file
+	mov ax, si
+	mov cx, dx
+	mov bx, buffer
+
+	call os_write_file ;ax filename, bx buffer to save, cx amount of bytes to write.
+	jmp second
+	
+the_file_exists:
+	push si
+	mov ax, input_buffer_copy
+	mov cx, 32768
+	call os_load_file
+	mov si, 32768
+	mov di, buffer
+	call hex_to_bin
+	pop si
+	mov ax, si
+	call os_remove_file
+	mov cx, bx
+	mov ax, si
+	mov bx, buffer
+	call os_write_file
+	
+	jmp second
+	
+	; Converts ASCII hex string in DS:SI to binary buffer in ES:DI
+; Each pair of ASCII chars becomes one byte (e.g. "4F2A" -> 0x4F, 0x2A)
+
+hex_to_bin:
+	xor dx, dx
+    xor     ax, ax         ; Clear AX
+.next_pair:
+	inc dx
+    lodsb                  ; Load first hex char into AL from DS:SI
+	cmp al, 32
+	je .done
+    cmp     al, 0
+    je      .done          ; If null terminator, we're done
+    call    ascii_to_nibble
+    shl     al, 4          ; Move high nibble to upper half of byte
+    mov     ah, al         ; Store high nibble in AH
+	
+	inc dx
+    lodsb                  ; Load second hex char
+	cmp al, 32
+	je .done
+    cmp     al, 0
+    je      .done          ; Unexpected null? (odd-length input)
+    call    ascii_to_nibble
+    or      al, ah         ; Combine high and low nibble into AH
+
+    stosb                  ; Store AH into ES:DI
+    jmp     .next_pair
+
+.done:
+	mov byte [di], 0
+	ret
+
+; ------------------------------
+; Converts ASCII hex char in AL to nibble (0-15)
+; Output: AL = binary nibble
+; Clobbers: nothing else
+ascii_to_nibble:
+    cmp     al, '0'
+    jb      .invalid
+    cmp     al, '9'
+    jbe     .num
+    cmp     al, 'A'
+    jb      .lowercase
+    cmp     al, 'F'
+    jbe     .upper
+.lowercase:
+    cmp     al, 'a'
+    jb      .invalid
+    cmp     al, 'f'
+    ja      .invalid
+    sub     al, 'a' - 10
+    ret
+.upper:
+    sub     al, 'A' - 10
+    ret
+.num:
+    sub     al, '0'
+    ret
+
+.invalid:
+    xor     al, al         ; Return 0 on invalid (could also signal error)
+    ret
+
 	
 boot_pcx db 'BOOT.PCX', 0
 found_custom_boot:
@@ -601,9 +722,19 @@ del_file:
 	call os_remove_file
 	jmp second
 shutdown_do:
-	call clear
-	mov si, shutdown_msg
-	call os_print_string
+	mov ax, 5301h       ; Connect APM interface
+	xor bx, bx
+	int 15h
+	
+	mov ax, 530Eh       ; Set APM version
+	mov bx, 0001h
+	mov cx, 0102h       ; Version 1.2
+	int 15h
+
+	mov ax, 5307h       ; Set power state
+	mov bx, 0001h       ; All devices
+	mov cx, 0003h       ; Power off
+	int 15h
 	jmp $
 	
 reboot_do:
@@ -783,7 +914,9 @@ reboot_str db 'REBOOT', 0, 255 ;done
 del_str db 'DEL', 0, 255 ;done
 ren_str db 'REN', 0, 255 ;done
 help_str db 'HELP', 0, 255 ;done
-copy_str db 'COPY', 0
+copy_str db 'COPY', 0, 255
+hexsave db 'HEXSAVE', 0, 255 ;allows users to create binary files from a VERY LONG STRING of hexor a ascii file, so theoretically you could just use this as a copy function.
+volumename db 'NAME', 0 ;saves new volume name to FAT12 root directory.
 kernel_iden_two db 'KERNEL'
 	
 drive_set_to_a db 10, 13,'Drive set to A', 0
@@ -795,7 +928,7 @@ no_drive_msg db 10, 13, 'Drive not present', 0
 tmp_one dw 0
 
 previous_file_run times 13 db 0
-input_buffer times 60 db 0
+input_buffer times 120 db 0
 input_buffer_copy times 60 db 0
 input_buffer_copy_copy times 60 db 0
 
@@ -818,7 +951,9 @@ skiplines dw 0
 %include "./extra/functions.asm"
 %include "./extra/old_funcs.asm"
 disk_buffer equ 24576
-
 dirlist:
-sector_buffer:
+sector_buffer times 32 db 0
 buffer:
+
+
+;4b8b
