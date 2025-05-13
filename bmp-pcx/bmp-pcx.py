@@ -1,45 +1,101 @@
 #!/usr/bin/env python3
 
 import argparse
-from PIL import Image
+from PIL import Image, ImageOps
 import subprocess
+import os
 
-# Function to convert BMP to 8-bit
-def convert_to_8bit(image_path):
-    img = Image.open(image_path)
+# Resize image to 320x200 with black bars on the sides, maintaining aspect ratio
+def resize_with_black_bars(image):
+    target_size = (320, 200)
+    # Resize based on height, maintain aspect ratio
+    w, h = image.size
+    scale = target_size[1] / h
+    new_w = int(w * scale)
+    new_h = target_size[1]
 
-    # Convert to 8-bit (indexed color)
-    img = img.convert("P", palette=Image.ADAPTIVE, colors=256)
-    
-    # Save the image as 8-bit BMP
-    output_8bit_bmp = "output_8bit.bmp"
-    img.save(output_8bit_bmp)
-    return output_8bit_bmp
+    resized = image.resize((new_w, new_h), Image.LANCZOS)
 
-# Function to convert 8-bit BMP to PCX using ImageMagick
+    # Create black background image
+    final = Image.new("RGB", target_size, (0, 0, 0))
+    paste_x = (target_size[0] - new_w) // 2
+    final.paste(resized, (paste_x, 0))
+
+    return final
+
+# Convert image to 8-bit palette
+def convert_to_8bit(image):
+    return image.convert("P", palette=Image.ADAPTIVE, colors=256)
+
+# Save 8-bit BMP for further conversion
+def save_temp_bmp(image):
+    temp_bmp = "temp_8bit.bmp"
+    image.save(temp_bmp)
+    return temp_bmp
+
+# Use ImageMagick to convert BMP to PCX
 def bmp_to_pcx(input_bmp, output_pcx):
-    # Use ImageMagick's convert command via subprocess to convert BMP to PCX
     try:
         subprocess.run(["convert", input_bmp, output_pcx], check=True)
         print(f"Image successfully saved as {output_pcx}")
     except subprocess.CalledProcessError as e:
         print(f"Error during conversion: {e}")
 
-# Main function to convert BMP to 8-bit and then to PCX
-def main(input_bmp, output_pcx):
-    # Step 1: Convert BMP to 8-bit BMP
-    output_8bit_bmp = convert_to_8bit(input_bmp)
+# Main process
+def main(input_path, output_path):
+    # Load image
+    img = Image.open(input_path).convert("RGB")  # Force RGB in case it's palette or grayscale
 
-    # Step 2: Convert the 8-bit BMP to PCX
-    bmp_to_pcx(output_8bit_bmp, output_pcx)
+    # Resize with pillarbox if needed
+    resized_img = resize_with_black_bars(img)
+
+    # Convert to 8-bit
+    img_8bit = convert_to_8bit(resized_img)
+
+    # Save temp BMP
+    temp_bmp = save_temp_bmp(img_8bit)
+
+    # Convert to PCX
+    bmp_to_pcx(temp_bmp, output_path)
+
+    # Clean up temporary BMP file
+    os.remove(temp_bmp)
 
 if __name__ == "__main__":
-    # Set up the argument parser
-    parser = argparse.ArgumentParser(description="Convert BMP to PCX via 8-bit conversion.")
-    parser.add_argument("input_bmp", help="Path to the input BMP file")
-    parser.add_argument("output_pcx", help="Path to the output PCX file")
-
-    # Parse the arguments
+    parser = argparse.ArgumentParser(description="Convert BMP to 320x200 8-bit PCX with aspect ratio maintained.")
+    parser.add_argument("input_bmp", help="Path to input BMP")
+    parser.add_argument("output_pcx", help="Path to output PCX")
     args = parser.parse_args()
-    # Run the main function with the provided arguments
     main(args.input_bmp, args.output_pcx)
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+
+def convert_bmp_to_pcx(input_bmp, output_pcx):
+    try:
+        subprocess.run([
+            "convert",
+            input_bmp,
+            "-resize", "320x200",
+            "-background", "black",
+            "-gravity", "center",
+            "-extent", "320x200",
+            "-colors", "256",
+            "-define", "bmp:subtype=RGB",
+            output_pcx
+        ], check=True)
+        print(f"Image converted and saved as: {output_pcx}")
+    except subprocess.CalledProcessError as e:
+        print(f"ImageMagick convert failed: {e}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Convert any image to 320x200 PCX (8-bit, centered, black bars if needed).")
+    parser.add_argument("input_bmp", help="Path to input BMP (or any format ImageMagick supports)")
+    parser.add_argument("output_pcx", help="Path to output PCX file")
+    args = parser.parse_args()
+
+    convert_bmp_to_pcx(args.input_bmp, args.output_pcx)
+
+if __name__ == "__main__":
+    main()

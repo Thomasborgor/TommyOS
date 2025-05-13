@@ -20,6 +20,7 @@ mov gs, ax
 start2:
 
 mov [bootdev], dl
+mov byte [real_dirlist], dl
 push es
 mov ah, 8
 int 13h
@@ -561,6 +562,13 @@ ready_the_drive:
 	
 no_drive:
 	popa
+	
+	mov cx, 0
+	mov ax, dirlist
+	mov dl, [real_dirlist]
+	mov [bootdev], dl
+	call os_get_file_list
+
 	mov si, no_drive_msg
 	call os_print_string
 
@@ -619,6 +627,7 @@ copy_do:
 	add dx, 1			; Head numbers start at 0 - add 1 for total
 	mov [Sides], dx
 	call ready_the_drive
+	jc no_drive
 	ready_for_param_seek:
 
 
@@ -661,6 +670,7 @@ copy_do:
 	add dx, 1			; Head numbers start at 0 - add 1 for total
 	mov [Sides], dx
 	call ready_the_drive
+	jc no_drive
 	ready_for_param_seek2:
 	cmp byte [si], ':'
 	jne unknown_command_place
@@ -685,10 +695,12 @@ is_a_or_b:
 	jne failed
 	mov byte [bootdev], 1
 	call ready_the_drive
+	jc no_drive
 	jmp ready_for_param_seek
 	is_a_one:
 	mov byte [bootdev], 0
 	call ready_the_drive
+	jc no_drive
 	jmp ready_for_param_seek
 	
 is_a_or_b_2:
@@ -700,10 +712,12 @@ is_a_or_b_2:
 	jne failed
 	mov byte [bootdev], 1
 	call ready_the_drive
+	jc no_drive
 	jmp ready_for_param_seek2
 	is_a_one_2:
 	mov byte [bootdev], 0
 	call ready_the_drive
+	jc no_drive
 	jmp ready_for_param_seek2
 	
 	
@@ -924,7 +938,7 @@ drive_set_to_b db 10, 13,'Drive set to B', 0
 no_drive_msg db 10, 13, 'Drive not present', 0
 
 
-
+real_dirlist db 0
 tmp_one dw 0
 
 previous_file_run times 13 db 0

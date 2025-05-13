@@ -37,6 +37,7 @@ os_get_file_list:
 	stc
 	mov dl, [bootdev]
 	int 13h				; Read sectors
+	jc donedid
 	call disk_reset_floppy		; Check we've read them OK
 	jnc .show_dir_init		; No errors, continue
 
@@ -152,6 +153,11 @@ os_get_file_list:
 
 	.file_list_tmp		dw 0
 .volumenamebuffer times 12 db 0
+donedid:
+	popa
+	popa
+	stc
+	ret
 
 ; ------------------------------------------------------------------
 ; os_load_file -- Load file into RAM
