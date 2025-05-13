@@ -34,7 +34,6 @@ not:
 	mcopy -i floppy.img ./cdcmd/paint.bin ::PAINT.BIN
 	mcopy -i floppy.img ./def.tom ::DEF.TOM
 	mcopy -i floppy.img ./cdcmd/32.bin ::32.BIN
-	mcopy -i floppy.img ./extra/doogle.bin ::doogle.BIN
 	clear
 	
 commit:
