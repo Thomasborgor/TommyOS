@@ -34,6 +34,7 @@ not:
 	mcopy -i floppy.img ./cdcmd/paint.bin ::PAINT.BIN
 	mcopy -i floppy.img ./def.tom ::DEF.TOM
 	mcopy -i floppy.img ./cdcmd/32.bin ::32.BIN
+	mcopy -i floppy.img ./output.pcx ::A.PCX
 	clear
 	
 commit:
@@ -43,7 +44,7 @@ commit:
 	git push --force origin main 
 
 small:
-	qemu-system-x86_64 -boot order=a -fda floppy.img -fdb image2.img -hda mydisk.img
+	qemu-system-x86_64 -boot order=a -fda floppy.img  -hda mydisk.img
 
 	clear
 	
