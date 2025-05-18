@@ -1,1 +1,18 @@
-b800208ed8be8b4bac3c007406b40ecd10ebf5c3
+def dir
+rnd 000 002 dir
+cmp dir 000
+jye 011
+cmp dir 001
+jye 015
+clr
+prt "forward"
+getky 013 dir
+jmp 002
+clr
+prt "left"
+getky 013 dir
+jmp 002
+clr
+prt "right"
+getky 013 dir
+jmp 002

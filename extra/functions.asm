@@ -1240,7 +1240,7 @@ disk_read_fat:
 	call disk_convert_l2hts
 
 	mov si, disk_buffer		; Set ES:BX to point to 8K OS buffer
-	mov bx, 2000h
+	mov bx, 1000h
 	mov es, bx
 	mov bx, si
 

@@ -84,7 +84,7 @@ start:
 
     ; Draw initial dot
     call draw_dot
-
+	
 
 main_loop:
     ; Wait for a keypress
@@ -111,8 +111,9 @@ main_loop:
     cmp ah, 0x51     ; PageDown key to decrease color
     je color_down
 	
-	cmp ah, 0x01
+	cmp ah, 1
 	je alt
+	
 	cmp al, '~'
 	je save_file_pcx
 
