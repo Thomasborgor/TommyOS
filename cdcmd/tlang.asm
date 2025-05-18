@@ -1632,28 +1632,16 @@ stop_note:
 	
 clear:
 	pusha
-	mov ah, 0x03
-	mov bh, 0x00 
+	mov ax, 0x0700
 	int 0x10
-	
-	mov ah, 0x02
-	mov dh, 0
-	mov dl, 0
+	mov bh, 0x07
+	mov cx, 0
+	mov dx, 0x1950
 	int 0x10
-
-    mov ax, 0x0700  ; function 07, AL=0 means scroll whole window
-    mov bh, 0x07    ; character attribute = white on black
-    mov cx, 0x0000  ; row = 0, col = 0
-    mov dx, 0x184f  ; row = 24 (0x18), col = 79 (0x4f)
-    int 0x10        ; call BIOS video interrupt
-
-    popa
+	popa
 	
 	sub word [offset_counter], 2
-	call prep_si
-	call find_next_line
-	call prep_si
-	jmp test_start
+	jmp inc_and_rerun_two
 
 clear_but_ret:
 	pusha

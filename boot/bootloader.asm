@@ -176,9 +176,10 @@ fatal_disk_error:
 read_fat_ok:
 	popa
 
-	mov ax, 2000h			; Segment where we'll load the kernel
+	mov ax, 1000h          ; Segment where we'll load the kernel (safe low memory)
 	mov es, ax
 	mov bx, 0
+
 
 	mov ah, 2			; int 13h floppy read params
 	mov al, 1
@@ -198,7 +199,7 @@ load_file_sector:
 
 	call l2hts			; Make appropriate params for int 13h
 
-	mov ax, 2000h			; Set buffer past what we've already read
+	mov ax, 1000h			; Set buffer past what we've already read
 	mov es, ax
 	mov bx, word [pointer] ; starts out as 0
 
@@ -260,7 +261,7 @@ end:					; We've got the file to load!
 	mov cx, [SectorsPerTrack]
 	mov bx, [Sides]
 
-	jmp 2000h:0000h			; Jump to entry point of loaded kernel!
+	jmp 1000h:0000h			; Jump to entry point of loaded kernel!
 
 
 ; ------------------------------------------------------------------

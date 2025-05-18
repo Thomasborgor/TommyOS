@@ -33,8 +33,8 @@ not:
 	mcopy -i floppy.img ./cdcmd/haha.bin ::format.bin
 	mcopy -i floppy.img ./cdcmd/paint.bin ::PAINT.BIN
 	mcopy -i floppy.img ./def.tom ::DEF.TOM
-	mcopy -i floppy.img ./cdcmd/32.bin ::32.BIN
-	mcopy -i floppy.img ./output.pcx ::A.PCX
+	mcopy -i floppy.img ./extra/doogle.bin ::32.BIN
+	#mcopy -i floppy.img ./out.pcx ::A.PCX
 	clear
 	
 commit:
@@ -42,6 +42,9 @@ commit:
 	git add . && \
 	git commit -m "$$msg" && \
 	git push --force origin main 
+
+hard: 
+	qemu-system-x86_64 -hda mydisk.img
 
 small:
 	qemu-system-x86_64 -boot order=a -fda floppy.img  -hda mydisk.img

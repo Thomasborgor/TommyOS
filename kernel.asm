@@ -4,13 +4,13 @@
 cli
 mov ax, 0
 mov ss, ax
-mov sp, 2000h
+mov sp, 1000h
 mov bp, 0
 sti
 
 cld
 
-mov ax, 2000h
+mov ax, 1000h
 mov ds, ax
 mov es, ax
 mov fs, ax
@@ -95,13 +95,13 @@ main:
 
 		mov si, prompt
 		call os_print_string
-		mov cx, 40
+		mov cx, 120
 		mov si, input_buffer
 		rst_loop:
 			mov byte [si], 0x00
 			inc si
 			loop rst_loop
-		mov cx, 40
+		mov cx, 60
 		mov si, input_buffer_copy
 		rst_loop2:
 			mov byte [si], 0
@@ -112,7 +112,7 @@ main:
 		mov al, 0
 		mov di, input_buffer_copy_copy
 		rep stosb		
-		lea di, [input_buffer]
+		mov di, input_buffer
 		mov word [tmp_one], 0
 		input_loop:
 		xor ah, ah
@@ -128,36 +128,31 @@ main:
 		mov ah, 0x0e
 		int 0x10
 		inc word [tmp_one]
-		cmp word [tmp_one], 400
+		cmp word [tmp_one], 120
 		jne input_loop
 		jmp parse
 backspace:
-	mov bh, 0
-	mov ah, 0x03
-	int 0x10
-	cmp dl, 2
-	jle input_loop
+	cmp word [tmp_one], 1
+	jl input_loop
 	mov si, backspace_msg
 	call os_print_string
-
+	dec word [tmp_one]
 	dec di
 	jmp input_loop
 
 
 parse: ;how we are going to do this:
-	cmp word [tmp_one], 60
+	mov byte [tmp_one], 0
+	cmp word [tmp_one], 120
 	jne do_it_thing
 	dec di
 	do_it_thing:
 	mov byte [di], 0x00
+
 	
 	mov si, input_buffer
 	mov di, buffer
-	mov cx, 60
-	lopp:
-		lodsb
-		stosb
-	loop lopp
+	call os_string_copy
 	
 	cmp byte [input_buffer], 0
 	je second
@@ -167,26 +162,16 @@ parse: ;how we are going to do this:
 	
 	mov si, input_buffer
 	mov di, input_buffer_copy
-	get_first_param:
-		lodsb
-		cmp al, 32
-		je done_thingying
-		cmp al, 00
-		je done_thingying
-		stosb
-		jmp get_first_param
-	done_thingying:
+	call os_string_copy
+	
 	
 	push ax
 	mov si, input_buffer
 	mov di, kernel_iden_two
 	mov cx, 6
-	
 	repe cmpsb
 	je no_kernel
 	pop ax
-	
-	mov si, ax
 	
 	mov di, time_str
 	call compare_string
@@ -272,7 +257,9 @@ parse: ;how we are going to do this:
 	cmp byte [si+1], ':'
 	je figure_out_drive
 	
+	
 	unknown_command_place:
+
 	mov si, unkown_command
 	call os_print_string
 	jmp second
@@ -435,7 +422,7 @@ found_custom_boot:
 	mov ax, 1003h			; No blinking text!
 	int 10h
 
-	mov ax, 2000h			; Reset ES back to original value
+	mov ax, 1000h			; Reset ES back to original value
 	mov es, ax
 	jmp main
 	
@@ -587,7 +574,7 @@ yes_run_pcx:
 	mov ax, 1003h			; No blinking text!
 	int 10h
 
-	mov ax, 2000h			; Reset ES back to original value
+	mov ax, 1000h			; Reset ES back to original value
 	mov es, ax
 	jmp second
 
