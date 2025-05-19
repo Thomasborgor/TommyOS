@@ -331,9 +331,9 @@ hexsave_do:
 the_file_exists:
 	push si
 	mov ax, input_buffer_copy
-	mov cx, 32768
+	mov cx, 16384
 	call os_load_file
-	mov si, 32768
+	mov si, 16384
 	mov di, buffer
 	call hex_to_bin
 	pop si
@@ -630,7 +630,7 @@ copy_do:
 
 	
 	mov ax, input_buffer_copy
-	mov cx, 32768
+	mov cx, 16384
 	call os_load_file
 	mov si, [tmp_one]
 	sub si, 2
@@ -663,7 +663,7 @@ copy_do:
 	jne unknown_command_place
 	
 	mov cx, [tmp_one]
-	mov bx, 32768
+	mov bx, 16384
 	mov ax, input_buffer_copy_copy
 	;mov byte  [bootdev], 0x80
 	call os_write_file
@@ -824,7 +824,7 @@ no_kernel:
 	jmp second
 	
 load_program:	
-	mov cx, 32768
+	mov cx, 16384
 	mov ax, input_buffer_copy
 	call os_load_file
 	
@@ -844,7 +844,7 @@ load_program:
 	mov dl, [bootdev]
 	mov ax, [SecsPerTrack]
 	mov bx, [Sides]
-	call 32768
+	call 16384
 	
 	
 	jmp second
@@ -852,7 +852,7 @@ load_program:
 no_param:
 	mov si, buffer
 	mov byte [si], 0xFF
-	call 32768
+	call 16384
 	jmp second
 	
 
