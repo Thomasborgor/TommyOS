@@ -1,5 +1,5 @@
 [BITS 16]
-[ORG 0x8000]
+[ORG 12288]
 
 start:
     ; Set video mode 13h (320x200, 256 colors)

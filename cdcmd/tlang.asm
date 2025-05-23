@@ -1,5 +1,5 @@
 [bits 16]
-org 32768 ;entry at 0xa400
+org 0x2600 ;entry at 0xa400
 ;note: ax 0x0eb8 is the death character >:( I HATE YOU
 ;note: when adding or subbing or incing or decing si at ANY TIME, must do the same to offset_counter. MUST DO THAT.
 

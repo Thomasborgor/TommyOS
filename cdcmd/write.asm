@@ -1,5 +1,5 @@
 [bits 16]
-[org 32768]
+[org 0x2600]
 mov [buffer], word si
 mov [SecsPerTrack], ax
 mov [Sides], bx
@@ -14,7 +14,7 @@ create_file:
 mov ax, [buffer]
 call custom_create_file
 
-mov word [offset_counter], 43007
+mov word [offset_counter], 32767
 yeah:
 mov si, [buffer]
 mov di, test_txt
@@ -28,7 +28,6 @@ done_storing:
 mov byte [di], 0
 
 
-
 call clear
 mov ah, 0x05
 
@@ -39,14 +38,14 @@ mov ah, 0x02
 mov dx, 0x0100
 int 0x10
 mov ax, test_txt
-mov cx, 43008			; Load file ?? after program start
+mov cx, 32768			; Load file ?? after program start
 	call os_load_file
 
 
 	; Now BX contains the number of bytes in the file, so let's add
 	; the load offset to get the last byte of the file in RAM
 
-	add bx, 43008
+	add bx, 32768
 	mov [end_of_file], bx
 
 	ready:
@@ -65,7 +64,7 @@ mov cx, 43008			; Load file ?? after program start
 	popa
 
 txt_start:
-    mov si, 43008               ; Start of text data (file in memory)
+    mov si, 32768               ; Start of text data (file in memory)
     mov al, 0                   ; Initialize current page
     mov [current_page], al      ; Start at page 0
     mov dh, 1                  ; Start at the first row (line 0)
@@ -303,16 +302,23 @@ no_crlf_trim:
     inc di                 ; move to where we want the null terminator
     mov byte [di], 0 
 	
-	mov ax, 0x2000
-	mov ds, ax
+	mov ax, 0x0500
+	int 0x10
 	mov byte [current_page], 0
 	mov cx, 7
 	clear_loop:
 		call clear
 		inc byte [current_page]
+		mov ah, 5
+		mov al, [current_page]
+		int 0x10
 		loop clear_loop
 	mov ax, 0x0500
 	int 0x10
+	mov ax, 0x1000
+	mov ds, ax
+	mov ax, 0x1000
+	mov es, ax
 
     mov ax, test_txt    ; Placeholder commands
     call os_remove_file
@@ -546,23 +552,14 @@ print_char_and_check_wrap:
 	
 clear:
 	pusha
-	mov ah, 0x03
-	mov bh, [current_page]
-	int 0x10
-	
-	mov ah, 0x02
-	mov bh, [current_page]
-	mov dh, 0
-	mov dl, 0 
-	int 0x10
-
-	mov ax, 0x0700  ; function 07, AL=0 means scroll whole window
-	mov bh, 0x07    ; character attribute = white on black
-	mov cx, 0x0000  ; row = 0, col = 0
-	mov dx, 0x184f  ; row = 24 (0x18), col = 79 (0x4f)
-	int 0x10        ; call BIOS video interrupt
-
+	mov ah, 07h        ; Scroll up function
+	mov al, 0          ; Clear entire screen (scroll all lines)
+	mov bh, 0x07
+	mov cx, 0000h      ; Upper left corner (row 0, col 0)
+	mov dx, 184FH      ; Lower right corner (row 24, col 79)
+	int 10h
 	popa
+
 	ret
 	
 delay:
@@ -589,10 +586,11 @@ welcome db 'Welcome back!', 10, 13, 0
 test_txt times 12 db 0
 skiplines dw 0
 disk_buffer equ 24576
-dirlist dw 1024
-write_buffer times 10000 db 0 ;large
+
+write_buffer times 10000 db 0
 current_page db 0
 offset_counter dw 0
 end_of_file dw 0
 final_page db 0
+dirlist:
 buffer:

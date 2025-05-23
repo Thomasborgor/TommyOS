@@ -1,5 +1,5 @@
 [BITS 16]
-[ORG 32768]         ; The bootloader code starts at 0x7C00
+[ORG 0x2600]         ; The bootloader code starts at 0x7C00
 mov [bootdev], dl
 mov [SecsPerTrack], ax
 mov [Sides], bx
@@ -23,7 +23,7 @@ call os_file_exists
 jc afterdjdjdj
 mov ax, filename_buf2
 call os_print_pcx
-mov ax, 2000h			; Reset ES back to original value
+mov ax, 1000h			; Reset ES back to original value
 mov es, ax
 mov ax, filename_buf2
 call os_remove_file
