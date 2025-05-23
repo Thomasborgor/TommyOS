@@ -3,6 +3,7 @@
 # Default target
 not:
 	nasm -fbin ./boot/bootloader.asm -o ./boot/bootloader.bin
+	nasm -fbin ./extra/bootloader.asm -o ./extra/hddboot.bin
 	nasm -fbin kernel.asm -o kernel.bin
 	nasm -fbin ./cdcmd/write.asm -o ./cdcmd/write.bin
 	nasm -fbin ./cdcmd/screensaver.asm -o ./cdcmd/screensaver.bin
@@ -11,6 +12,7 @@ not:
 	nasm -fbin ./cdcmd/paint.asm -o ./cdcmd/paint.bin
 	nasm -fbin ./cdcmd/32.asm -o ./cdcmd/32.bin
 	nasm -fbin ./extra/doogle.asm -o ./extra/doogle.bin
+	nasm -fbin ./extra/fpu.asm -o ./extra/fpu.bin
 
 	@echo "Creating Preloaded Images..."
 	#bmp-pcx ./extra/sample.bmp ./extra/logo.pcx
@@ -23,8 +25,8 @@ not:
 	mcopy -i mydisk.img ./extra/test.txt ::TEST.TXT
 	dd if=./boot/bootloader.bin of=floppy.img bs=512 conv=notrunc status=noxfer
 	mcopy -i floppy.img kernel.bin ::KERNEL.BIN
-	mcopy -i floppy.img ./cdcmd/write.bin ::WRITE.BIN
 	mcopy -i floppy.img ./cdcmd/screensaver.bin ::SCRNSAVR.BIN
+	mcopy -i floppy.img ./cdcmd/write.bin ::WRITE.BIN
 	mcopy -i floppy.img ./cdcmd/tlang.bin ::BASIC.BIN
 	mcopy -i floppy.img ./extra/test.txt ::SAMPLE.TXT
 	mcopy -i floppy.img ./extra/logo.pcx ::BOOT.PCX
@@ -33,8 +35,8 @@ not:
 	mcopy -i floppy.img ./cdcmd/haha.bin ::format.bin
 	mcopy -i floppy.img ./cdcmd/paint.bin ::PAINT.BIN
 	mcopy -i floppy.img ./def.tom ::DEF.TOM
-	mcopy -i floppy.img ./extra/doogle.bin ::32.BIN
-	#mcopy -i floppy.img ./out.pcx ::A.PCX
+	mcopy -i floppy.img ./photos/bear1.pcx ::BEAR1.PCX
+	mcopy -i floppy.img ./photos/bear2.pcx ::BEAR2.PCX
 	clear
 	
 commit:
@@ -44,6 +46,7 @@ commit:
 	git push --force origin main 
 
 hard: 
+
 	qemu-system-x86_64 -hda mydisk.img
 
 small:

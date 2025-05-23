@@ -1,5 +1,5 @@
 [bits 16]
-org 32768          ; 
+org 16384          ; 
 mov ah, 0x01       ; Function to change cursor shape
 mov CX, 2607h
 int 0x10  

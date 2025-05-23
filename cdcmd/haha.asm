@@ -1,4 +1,4 @@
-[org 32768]
+[org 0x2600]
 
 mov cx, 0x0013
 mov dx, 0x0080 ;yep
