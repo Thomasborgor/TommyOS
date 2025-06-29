@@ -37,6 +37,8 @@ not:
 	mcopy -i floppy.img ./def.tom ::DEF.TOM
 	mcopy -i floppy.img ./photos/bear1.pcx ::BEAR1.PCX
 	mcopy -i floppy.img ./photos/bear2.pcx ::BEAR2.PCX
+	mcopy -i floppy.img ./extra/basic.txt ::BASIC.TXT
+	mcopy -i floppy.img ./extra/doogle.bin ::32.bin
 	clear
 	
 commit:
@@ -50,13 +52,16 @@ hard:
 	qemu-system-x86_64 -hda mydisk.img
 
 small:
-	qemu-system-x86_64 -boot order=a -fda floppy.img  -hda mydisk.img
+	qemu-system-x86_64 -boot order=a -fda floppy.img
 
 	clear
 	
 big:
 	qemu-system-x86_64 -boot order=a -fda floppy.img -fdb image2.img -hda mydisk.img -full-screen
 	clear
+	
+getkey:
+	qemu-system-i386 -hda ../../getkey/getkey.bin
 	
 iso_image:
 	mkisofs -quiet -V 'TOMMYOS' -input-charset iso-8859-1 -o ./floppy.iso -b floppy.img ./

@@ -1,18 +1,19 @@
 [BITS 16]
-[ORG 12288]
 
 start:
     ; Set video mode 13h (320x200, 256 colors)
     mov ax, 0x0013
     int 0x10
 
-    ; Set ES to point to VGA memory segment
+    ; Set ES to VGA memory, DS to segment containing data
     mov ax, 0xA000
     mov es, ax
+    mov ax, 0x2000
+    mov ds, ax
 
-    ; Point SI to the string to render
+    ; SI points to message, BX = row/col
     mov si, message
-    xor bx, bx        ; BX = (row << 8 | col), starting at (0,0)
+    xor bx, bx        ; BH = row, BL = column (in character units)
     call draw_string
 
     ; Wait for keypress
@@ -21,10 +22,15 @@ start:
 
     ; Return to caller
     retf
-message db 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890this is super skibidi grimace shake', 0
+
 ; ---------------------------------------
-; Draw null-terminated string from SI
-; BX = Y:BH, X:BL (char position)
+; Message to display
+; ---------------------------------------
+message db 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890 this is super skibidi grimace shake', 0
+
+; ---------------------------------------
+; Draw null-terminated string from DS:SI
+; BX = BH: row (Y), BL: col (X), both in char units (8px steps)
 ; ---------------------------------------
 draw_string:
     pusha
@@ -46,66 +52,89 @@ draw_string:
 
 .skip:
     inc bl
-    cmp bl, 40         ; max columns (320 / 8)
+    cmp bl, 40         ; 40 chars per row (320 / 8)
     jb .next_char
-	mov bl, 8
-	add bh, 8
+
+    mov bl, 0          ; Reset column
+    add bh, 5
+    cmp bh, 200         ; Max 25 rows (200 / 8)
+    jae .done
     jmp .next_char
 
 .done:
     popa
     ret
 
-; ---------------------------------------
-; Draw character in AL at (BH: row, BL: col)
-; ---------------------------------------
+
 draw_char:
     pusha
 
-    ; Get font offset: (AL - 32) * 8
+    ; Convert char to font offset: (AL - 32) * 8
     sub al, 32
     movzx si, al
     shl si, 3
     add si, font8x8
 
-    ; Compute starting pixel offset
+    ; Convert char col (BL) and row (BH) to pixel coordinates
     movzx ax, bl
-    shl ax, 3          ; X * 8
+    shl ax, 3          ; AX = column in pixels (X)
     movzx dx, bh
-	shl dx, 2
-	
-    ; DI = (Y * 8) * 320 + X * 8
-    mov di, dx
-    shl dx, 6
-    shl di, 2
-    add di, dx
-    add di, ax
+    shl dx, 3          ; DX = row in pixels (Y)
 
+    ; Compute initial DI = Y * 320 + X
+    mov di, dx
+    shl dx, 6          ; DX = Y * 64
+    shl di, 2          ; DI = Y * 4
+    add di, dx         ; DI = Y * 320
+    add di, ax         ; Add X pixel offset
+
+    ; Adjust DI based on row group every 5 rows
+    mov ah, bh         ; AH = row index
+    cmp ah, 5
+    jb .skip_adjust    ; No adjustment needed for rows 0-4
+
+    ; group = (row / 5) - 1
+    xor al, al
+    mov al, ah
+    xor ah, ah         ; AX = row
+    mov bl, 5
+    div bl             ; AL = row / 5
+    dec al             ; subtract 1
+    cmp al, 0
+    js .skip_adjust    ; safeguard underflow
+
+    ; Multiply (row group - 1) * 4
+    mov bl, 4
+    mul bl             ; AX = adjustment
+    add di, ax         ; Apply to DI
+
+.skip_adjust:
+
+    ; Draw the 8x8 character at [ES:DI]
     mov cx, 8
 .row_loop:
     mov al, [si]
     inc si
 
     mov bx, di
-    mov bp, 0          ; column index (left to right)
+    mov bp, 0
 
 .next_bit:
     test al, 1
-    jz .skip
+    jz .skip_pixel
     mov byte [es:bx], 0x0F
-.skip:
+.skip_pixel:
     inc bx
     inc bp
     shr al, 1
     cmp bp, 8
     jl .next_bit
 
-    add di, 320
+    add di, 320        ; Go to next row of pixels
     loop .row_loop
 
     popa
     ret
-
 ; ---------------------------------------
 ; Custom 8x8 Bitmap Font for ASCII 32 to 126
 ; Each character is 8 bytes

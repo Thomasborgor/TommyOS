@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A's Bar and Grill</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        .top_bar {
+            background-color: rgba(0, 0, 255, 0.5);
+            font-size: 14px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 8%;
+            display: flex;
+            align-items: center;
+            z-index: 999;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .top_bar img {
+			position: absolute;
+            height: 100%;
+            left: 2%;
+        }
+        .top_bar p {
+            font-size: 22px;
+        }
+	
+		
+        .search_bar {
+			position: absolute;
+            width: 50%;
+            height: 50%;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            outline: none;
+			max-width: 10%;
+			right: 5%;
+        }
+		
+        body {
+            font-family: 'Poppins', sans-serif;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            width: 100%;
+            background-image: url('space.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+        .ps_note {
+            text-align: left;
+            width: 50%;
+            font-size: 11px;
+            background-color: rgba(255, 255, 255, 0.3);
+            height: auto;
+        }
+	
+		
+        .form_signup {
+            text-align: center;
+        }
+        p, h2 {
+            width: 100%;
+            max-width: 100%;
+        }
+		
+		.demolition {
+    width: 82.5vw;
+    z-index: 997;
+}
+    </style>
+</head>
+
+<body>
+    <div class="top_bar">
+        <img src="logo.jpg" alt="Our logo">
+        <p id="top_bar">A's Bar and Grill</p>
+        <input id="search_bar_id" type="text" class="search_bar" onkeydown="HandleEnterKey(event)" placeholder="Search...">
+    </div>
+    <br><br><br><br>
+    <h1>Welcome to A's Bar and Grill!</h1>
+	<br><br>
+    <h2>All your this-worldly needs, like food!</h2>
+	
+    <a href="employee.html" style="color: black; font-size: 20px;"><em>CLICK IF YOU ARE AN EMPLOYEE</em></a>
+
+    <br><br>
+
+    <p>Here at A's Bar and Grill, we only serve you the <em>finest</em> of ingredients*.<br>
+    We value** our customers, unlike other restaurants***.<br>
+    We would love to see you come to our delightful**** little abode and try our new food!*****</p>
+
+    <br>
+
+    <p>We have all new choices to eat, like <strong>Glorpian Stew</strong>, or <strong>Beef</strong>, or even some <strong>Martian Rocks</strong>******.<br>
+    We also just got some <strong>Shirley Temples</strong>, a new drink that we created!*******</p>
+
+    <br><br>
+
+    <h2>Modern Amenities</h2>
+
+    <p>At A's Bar and Grill, we don't have bathrooms.********<br>
+    We even have about 4 tables with one chair each!<br>
+    Our walls are made out of wood.*********<br>
+    We have a sink.<br>
+    We have two cabinets on stools.</p>
+
+    <br>
+
+    <p>Thank you for choosing,</p>
+
+    <h2>A's Bar and Grill</h2>
+
+    <p><em>Open -28:836 to 73:FF2 Standard Galactic Time (5:00+)</em></p>
+
+    <br><br>
+	
+    <div class="form_signup">
+        <p>Sign up for daily <strong>A's Bar and Grill</strong> updates!</p>
+        <form>
+            <label for="email">Enter your email:</label><br>
+            <input type="text" id="email" placeholder="example@example.com"><br>
+            <input type="submit" value="Submit" onclick="alert_user()">
+        </form>
+    </div>
+
+
+    <br><br>
+
+    <h2>Admin Login</h2>
+    <form id="loginForm">
+        <label for="username">Enter admin username:</label><br>
+        <input type="text" id="username"><br>
+        <label for="password">Enter admin password:</label><br>
+        <input type="password" id="password"><br>
+        <input type="submit" value="Continue">
+    </form>
+    <p id="errored" style="color: red;"></p>
+
+    <br><br>
+
+    <div class="ps_note">
+    <p><em>A special thanks to our </em>insterstellar<em> construction crew:<br>
+		Nate, Tommy, James, Claire, Audrey, Michael, Catie, Emma Faye, Samina, Justin, Ivan, Philip, Charles, and Ms. Sweet!</em></p>
+	</div>
+
+
+    <br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+	<img src="../sorry.jpg" class="demolition">
+	<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+
+    <p>*Ingredients not from this planet</p>
+    <p>**Value as in your money.</p>
+    <p>***Data has shown that other restaurants are better than us</p>
+    <p>****Delightfulness depends on the person</p>
+    <p>*****We like to call it food, but who really checks?</p>
+    <p>******Martian rocks not from Mars. Made in Venus.</p>
+    <p>*******Shirley Temple is a registered Earth trademark #85672191 owned by LEILA ROUHI.</p>
+    <p>********Execretion of bodily fluids and solids are banned in A's Bar and Grill.</p>
+    <p>*********Wood as in it's a very thin dried wood pulp. Good enough, right?</p>
+
+    <script>
+		const messageArray = [
+	"Creator of TommyOS!",
+	"Constructor of A's Bar and Grill!",
+	"Actually Ivan!",
+	"The Bartender!",
+	"thomasborgor.github.io",
+	"mov ax, 0x0e01 int 0x10",
+	"dramatic",
+	"did YOU sign up for leap win time this week?"
+]
+        document.addEventListener("DOMContentLoaded", function () {
+		const thingy = document.getElementById("top_bar");		
+		thingy.textContent = messageArray[Math.floor(Math.random() * messageArray.length)];
+            document.getElementById("loginForm").addEventListener("submit", function (event) {
+                event.preventDefault(); // Prevent form from reloading
+				
+
+                let username = document.getElementById("username").value.trim();
+                let password = document.getElementById("password").value.trim();
+
+                fetch("users.txt")
+                    .then(response => response.text())
+                    .then(data => {
+                        let users = data.split("\n").map(line => line.trim());
+
+                        let validUser = users.find(user => {
+                            let [storedUser, storedPass] = user.split(",");
+                            return storedUser === username && storedPass === password;
+                        });
+
+                        if (validUser) {
+                            window.location.href = "control_panel.html"; // Redirect on success
+                        } else {
+                            document.getElementById("errored").textContent = "Invalid credentials!";
+                        }
+                    })
+                    .catch(error => console.log("Error: ", error));
+            });
+        });
+
+        function HandleEnterKey(event) {
+            if (event.key === "Enter") {
+                let inputValue = document.getElementById('search_bar_id').value.trim().toUpperCase();
+                if (inputValue === "ALIEN") {
+                    window.location.href = "alien.html";
+                    return;
+                } else if (inputValue === "WHO IS THE COOLEST?") {
+					window.location.href = "jake.html";
+					return;
+				}
+                window.location.href = "search.html";
+            }
+        }
+
+        function alert_user() {
+            alert(document.getElementById("email").value + " has just been scammed!");
+        }
+    </script>
+</body>
+</html>
