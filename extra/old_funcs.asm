@@ -13,25 +13,26 @@ print_bcd:
     ret
 	
 print_time:
-	mov ah, 0x0E
-	mov al, 0x0a
-	int 0x10
-	mov al, 0x0d
-	int 0x10
-	mov ah, 0x02
-	int 0x1A
+	mov ax, 19			; Root dir starts at logical sector 19
+	call disk_convert_l2hts
 
-	mov al, ch
-	call print_bcd
+	mov si, disk_buffer		; Set ES:BX to point to OS buffer
+	mov bx, ds
+	mov es, bx
+	mov bx, si
 
-	mov al, cl
-	call print_bcd
 
-	mov al, dh
-	call print_bcd
-	
-	mov si, backspace_msg
-	call os_print_string
+	mov ah, 2			; Params for int 13h: read floppy sectors
+	mov al, 14			; And read 14 of them (from 19 onwards)
+stc				; A few BIOSes do not set properly on errors
+	mov dl, [bootdev]
+	int 13h				; Read sectors
+
+
+mov al, [disk_buffer]
+mov ah, 0eh
+int 0x10
+jmp $
 	jmp second
 	
 print_date:

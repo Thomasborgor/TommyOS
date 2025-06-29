@@ -424,6 +424,7 @@ found_custom_boot:
 
 	mov ax, 1000h			; Reset ES back to original value
 	mov es, ax
+	mov ds, ax
 	jmp main
 	
 echo_do:
@@ -576,6 +577,7 @@ yes_run_pcx:
 
 	mov ax, 1000h			; Reset ES back to original value
 	mov es, ax
+	mov ds, ax
 	jmp second
 
 	
@@ -824,10 +826,10 @@ no_kernel:
 	jmp second
 	
 load_program:	
-	mov cx, 0x2600
+	mov cx, 0x2000
 	mov ax, input_buffer_copy
 	call os_load_file
-	
+	mov cx, 0
 	mov ax, 0x0e0a
 	int 0x10
 	mov al, 0x0D
@@ -841,19 +843,33 @@ load_program:
 	jne find_param
 	
 	inc si ;send first param to the program
+	
 	mov dl, [bootdev]
 	mov ax, [SecsPerTrack]
 	mov bx, [Sides]
-	call 0x2600
 	
+	call 0x2000:0x0000
 	
+	mov ax, 0x1000
+	mov es, ax
+	mov ds, ax
+
 	jmp second
 	
 no_param:
 	mov si, buffer
 	mov byte [si], 0xFF
-	call 0x2600
-	jmp second
+	mov dl, [bootdev]
+	mov ax, [SecsPerTrack]
+	mov bx, [Sides]
+	call 0x2000:0x0000
+	
+	
+	mov ax, 0x1000
+	mov es, ax
+	mov ds, ax
+	
+	jmp second ;returns to main kernel
 	
 
 failed:

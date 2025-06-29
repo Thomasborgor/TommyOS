@@ -1,35 +1,50 @@
 [bits 16]
-org 0x2600 ;entry at 0xa400
 ;note: ax 0x0eb8 is the death character >:( I HATE YOU
 ;note: when adding or subbing or incing or decing si at ANY TIME, must do the same to offset_counter. MUST DO THAT.
 
 ;And with that, we have cut down the code from ~1600 lines to ~1000 lines.
 ;And all it took was a filesystem
 ;and with that filesystem we are at ~1700 lines again...
-mov [SecsPerTrack], ax
+
+mov [SecsPerTrack], ax ;why not prefixed with ES:? because then I would have to change pretty much all of functions.asm.
 mov [Sides], bx
 mov [bootdev], dl
-cmp byte [si], 0xff
-je no_file
-mov [skib_buffer], word si
-mov ax, si
+
+mov ax, 0x2000
+mov es, ax
+
+mov di, skibidi
+save_____that______filename:
+	lodsb
+	cmp al, 0
+	je donasd
+	mov [es:di], al
+	inc di
+	jmp save_____that______filename
+donasd:
+
+mov ax, 0x2000
+mov ds, ax
+mov ax, skibidi
 call os_file_exists
 jc halt
 
-call clear_but_ret   
-mov ax, [skib_buffer]
-mov cx, 43008
+
+mov cx, 0x3000
 call os_load_file
-mov word [offset_counter], 43008
-mov word [end_of_file], bx
-add word [end_of_file], 43008
-mov byte [line_counter], 1
 
-call os_seed_random
+mov [es:end_of_file], bx
 
-mov si, 43008
-mov word [offset_counter], 43008
+mov ax, 0x3000
+mov ds, ax
+mov ax, 0x2000
+mov es, ax
+
+mov si, 0
 call go_to_first_line
+jc halt
+mov byte [line_counter], 1
+call clear_but_ret
 
 
 jmp test_start ;why 'test_start'? because i didn't build this off of old basic.
@@ -37,46 +52,120 @@ skib_buffer dw 0
 ;this is completely new. I started over and called it 'test_start', as opposed to old basic's 'start'.
 test_loop: ;nice little debug mode that I made to test stuff
 		   ; gives [offset_counter], newline, first three chars, then the line count after a few spaces, then next line until EOF
-	mov ax, [offset_counter]
+	mov ax, [es:offset_counter]
 	call os_int_to_string
 	mov di, ax
 	call print
 	mov di, enter_msg
 	call print
 	
-	
+	mov cx, 3
+	.printout_loop:
+		lodsb
+		mov ah, 0eh
+		int 0x10
+		loop .printout_loop
+		
 	call prep_si
-	call get_cmd
-	mov di, cmd_buf
-	call print
+	mov di, es:prt_str
+	call test_test_string
+	jc do_something
 	
+	mov di, es:dec_str
+	call test_test_string
+	jc do_something_else
+
+
 	mov ax, 0x0e20
 	int 0x10
 	int 0x10
-	mov al, [line_counter]
+	mov al, [es:line_counter]
 	xor ah, ah
 	call os_int_to_string
 	mov di, ax
 	call print
 	
 	
+	
 	mov ah, 0
 	int 0x16
+	afterwards_thingy:
 	mov di, enter_msg
 	call print
 	
+	
 	call prep_si
-	call find_next_line
-	inc byte [line_counter]
-	mov ax, [offset_counter]
-	mov bx, [end_of_file]
-	cmp ax, bx
-	jl test_loop
-mov di, cmd_buf
-call print
+	inc byte [es:line_counter]
+	call find_next_line_but_better
+	jc halt
+	
+	jmp test_loop
+	
+do_something:
+	mov ax, 0x0e41
+	int 0x10
+	jmp afterwards_thingy
+do_something_else:
+	mov ax, 0x0e42
+	int 0x10
+	jmp $
+	jmp afterwards_thingy
+	
+find_next_line_but_better:
+	inc word [es:offset_counter]
+	call prep_si
+	cmp byte [si], 0
+	je halt_skib
+	cmp byte [si], 10
+	jne find_next_line_but_better
+	
+	newer_newline:
+		add word [es:offset_counter], 1
+		call prep_si
+		cmp byte [si], 10
+		je newer_newline
+		cmp byte [si], 13
+		je find_next_line_but_better
+		
+		
+		ret
+test_test_string:
+	test_test_string_loop:
+	mov al, [ds:si]
+	cmp al, 13
+	je equal_strings
+	cmp al, 32
+	je equal_strings
+	cmp al, 0
+	je equal_strings
+	inc si
+	mov bl, [es:di]
+	inc di
+	cmp al, bl
+	jne not_equal_strings
+	jmp test_test_string_loop
+	equal_strings:
+		stc
+		ret
+	
+	not_equal_strings:	
+		call prep_si ;effective reset, because we never change it in the code.
+		clc
+		ret
 
-ret
-
+halt_skib:
+	stc
+	ret
+		
+halt:
+	mov ah, 0x02
+	mov bh, 00
+	mov dl, 0
+	mov dh, 20
+	int 0x10
+	retf
+	
+	
 no_file:
 	mov di, no_file_thing
 	call print
@@ -84,131 +173,76 @@ no_file:
 	
 no_file_thing db 'No input file specified.', 0
 
-test_start:
+test_start:	;======================================================================================================================================================================
 	call prep_si
-	mov byte [char5], 1
-	call get_cmd
-	
-	mov ax, cmd_buf
-	call os_string_length
-	mov ax, [note_frequency]
-	
-	mov byte [char5], 1
-	mov di, cmpsr_str
-	call test_string
-	je cmpsr_string_found
-	
-	mov byte [char5], 1
-	mov di, getky_str
-	call test_string
-	je getky_string_found
-	
-	mov ax, [note_frequency]
-	sub ax, 5 ;compensate for 5 chars + length of command until 0x20 (space)
-	add word [offset_counter], ax
-	
-	call prep_si
-	mov byte [char5], 0
-	call get_cmd
-
-	
 	mov di, prt_str
-	call test_string
-	je prt_string_found
-
+	call test_test_string
+	jc prt_string_found
+	
 	mov di, mov_str
-	call test_string
-	je mov_string_found
-
-	mov di, add_str
-	call test_string
-	je add_string_found
+	call test_test_string
+	jc mov_string_found
 	
 	mov di, sub_str
-	call test_string
-	je sub_string_found
+	call test_test_string
+	jc sub_string_found
 	
-	mov di, hlt_str
-	call test_string
-	je halt
-	
-	mov di, inc_str
-	call test_string
-	je inc_string_found
-	
-	mov di, dec_str
-	call test_string
-	je dec_string_found
-	
-	mov di, del_str
-	call test_string
-	je del_string_found
-	
-	mov di, bel_str
-	call test_string
-	je bel_string_found
-	
-	
-	cmp byte [di], ';'
-	je inc_and_rerun_two
-	
-	mov di, cmp_str
-	call test_string
-	je cmp_string_found
-	
-	mov di, jmp_str
-	call test_string
-	je jmp_string_found
-	
-	mov di, jgr_str
-	call test_string
-	je jgr_string_found
-	
-	mov di, jye_str
-	call test_string
-	je jye_string_found
-	
-	mov di, jne_str
-	call test_string
-	je jne_string_found
-	
-	mov di, jls_str
-	call test_string
-	je jls_string_found
-	
-	mov di, clr_str
-	call test_string
-	je clear
-	
-	mov di, ask_str
-	call test_string
-	je ask_string_found
+	mov di, add_str
+	call test_test_string
+	jc add_string_found
 	
 	mov di, def_str
-	call test_string
-	je def_string_found
+	call test_test_string
+	jc def_string_found
 	
-	mov di, rand_str
-	call test_string
-	je rand_string_found
+	mov di, dec_str
+	call test_test_string
+	jc dec_string_found
 	
-	mov di, int_str
-	call test_string
-	je int_string_found
+	mov di, inc_str
+	call test_test_string
+	jc inc_string_found
 	
-	jmp syntax_error_halt
+	mov di, del_str
+	call test_test_string
+	jc del_string_found
 	
-halt:
-	mov ah, 0x02
-	mov bh, 00
-	mov dl, 0
-	mov dh, 20
-	int 0x10
+	mov di, bel_str
+	call test_test_string
+	jc bel_string_found
 	
-	ret
+	mov di, cmp_str
+	call test_test_string
+	jc cmp_string_found
+	
+	mov di, jye_str
+	call test_test_string
+	jc jye_string_found
+	
+	mov di, jmp_str
+	call test_test_string
+	jc jmp_string_found
+	
+	mov di, jne_str
+	call test_test_string
+	jc jne_string_found
+	
+	mov di, jls_str
+	call test_test_string
+	jc jls_string_found
+	
+	mov di, jgr_str
+	call test_test_string
+	jc jgr_string_found
+	
+	mov di, cmpsr_str
+	call test_test_string
+	jc cmpsr_string_found
+	
+	jmp halt
 	
 syntax_error_halt:
-	cmp byte [cmd_buf], 0
+	cmp byte [es:cmd_buf], 0
 	je halt;dumb fix but hey the problem was dumb too
 	mov ah, 0x02
 	mov bh, 00
@@ -239,7 +273,7 @@ syntax_error_halt:
 	call os_int_to_string
 	mov di, ax
 	call print
-	ret
+	retf
 	
 
 
@@ -377,1035 +411,926 @@ use_non_blocking:
 	jmp write_and_return
 	
 def_string_found:
+	add word [es:offset_counter], 4
 	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
-	mov di, str1_str
-	mov byte [char4], 1
-	call test_string
-	je reset_str1_offset
-	mov di, str2_str
-	mov byte [char4], 1
-	call test_string
-	je reset_str2_offset
-	mov ax, [tmp_cx]
-	sub ax, 3
-	sub word [offset_counter], ax  ;this has to be dynamically changed based on the amount of chars that the get_cmd's found in the last runs.
-	call prep_si
-	call get_cmd
 
+	mov di, cmd_buf
+	mov cx, 3
+	mov dx, 0
+	get_the_varname:
+		lodsb
+		stosb
+		cmp al, 0dh
+		je stop_getting
+		inc dx
+		loop get_the_varname ;get the filename.
+	stop_getting:
+		mov di, cmd_buf
+		add di, dx
+		mov al, 32
+		repe stosb
+	
 	
 	cmp byte [varcount], 30 ;checks if we are at 30 user vars
 	jge halt
-
-	mov byte [placeholder2], 0 ;reset the counter
-	mov ax, cmd_buf
-	call os_string_length ;get the length of the user var
-	xor ah, ah
-	mov [placeholder2], al
-	mov word [placeholder], 0
-	mov si, varnames
 	
-	find_open_var_spot:
-		lodsb                        ; Load a byte from si
-		cmp byte al, '?'           ; Check for default value
-		je found_open_spot       ; Continue if not a default
-		inc word [placeholder]      ; Increment counter
-		jmp find_open_var_spot
+	mov di, varnames
+	mov bx, cmd_buf
+	mov dx, -1
+		;find a open spot in varnames to save it
+		find_varnames_open_spot: 
+			mov al, [es:di] ;we find out what is the newest open variable spot.
+			inc di
+			inc dx
+			cmp al, '?'
+			jne find_varnames_open_spot
+			mov bx, cmd_buf
+			mov di, varnames
+			add di, dx
+			mov cx, 3
+			save_the_filename_to_the_buffer:
+				mov al, [es:bx]
+				inc bx
+				stosb
+				loop save_the_filename_to_the_buffer
+				
+			mov ax, dx
+			xor dx, dx
+			mov bx, 3
+			div bx
+			;quotient in ax 
+			mov di, es:varlocs ;wow am i stupid. FOR SOME GOOFY REASON, every thing in this file when not using SI should be prefixed with ES:
+			add di, ax 
+			inc di ;why i need to do this just to init a var as 0, IDK but it works!
+			;as is with everything in this codebase, am i right?
+			mov word [es:di], 0
+			
 		
-		found_open_spot:
+		inc byte [es:varcount]
+		sub word [es:offset_counter], 1
 		
-		dec byte [placeholder2]
+		jmp inc_and_rerun_three
 		
-		mov di, varnames
-		add di, [placeholder]
-		mov si, cmd_buf
-		mov cl, [placeholder2]
-		inc cl
-		xor ch, ch
-		store_it_loop:
-		lodsb
-		stosb
-		loop store_it_loop
 		
-		done_storing:
-		cmp byte [placeholder2], 1
-		je pad_one_zeros
-		cmp byte [placeholder2], 2
-		je end_pad
-		
-		pad_two_zeros:
-		mov byte [di], ' '
-		inc di
-	
-		pad_one_zeros:
-		mov byte [di], ' '
-		
-		end_pad:
-		mov al, 2
-		mul byte [varcount]
-		mov bl, al
-		xor bh, bh
-		mov ax, 0
-		call write_word_user_var
-	
-		inc byte [varcount]
-		sub word [offset_counter], 1
-		jmp inc_and_rerun_two
 	reset_str1_offset:
-		mov word [str1_offset], 00
+		mov word [es:str1_offset], 00
 		sub word [offset_counter], 2
-		
-		jmp inc_and_rerun_two
+
+		jmp inc_and_rerun_three
 	reset_str2_offset:
 		mov word [str2_offset], 00
 		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
+		jmp inc_and_rerun_three
 	
 ask_string_found:
-	;mov al, 0
-	;mov cx, 59
-	;mov di, str1_str_string
-	;repe stosb
-	;mov al, 0
-	;mov cx, 59
-	;mov di, str2_str_string
-	;repe stosb ;GENIUS MOVE UP HERE.
-	;Not like we will need ANY strings once we want another, right?
-	
-	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
-	mov byte [char4], 1
-	mov di, str1_str
-	call test_string
-	je ask_str1
-	
-	mov byte [char4], 1
-	mov di, str2_str
-	call test_string
-	je ask_str2
-	
-	jmp syntax_error_halt
-	
-	ask_str1:
-		mov si, str1_str_string
-		
-		get_ask_string_before:
-		mov dx, 0x1600
-		mov bh, 0
-		mov ah, 2
-		int 0x10
-		mov di, input_string_thing
-		call print
-		
-		get_ask_string:
-			xor ah, ah
-			int 0x16
-			cmp al, 0x0D
-			je ask_done
-			cmp al, 0x08
-			je do_backspace
-			mov byte [si], al
-			inc si
-			mov ah, 0x0e
-			int 0x10
-			cmp si, 59
-			je ask_done
-			jmp get_ask_string
-			
-		do_backspace:
-			mov ah, 0x03
-			mov bh, 00
-			int 0x10
-			cmp dl, 0x08
-			jle get_ask_string
-			dec si
-			mov ah, 0x0e
-			mov al, 0x08
-			int 0x10
-			mov al, 0x20
-			int 0x10
-			mov al, 0x08
-			int 0x10
-		jmp get_ask_string
-		
-		
-		ask_done:
-			mov byte [si], 0
-			mov si, str1_str_string
-			mov di, ext_str
-			mov cx, 3
-			repe cmpsb
-			je halt
-			mov dx, 0x1600
-			mov bh, 0
-			mov ah, 2
-			int 0x10
-			mov cx, 60
-			small_loop:
-				mov ah, 0x0e
-				mov al, ' '
-				int 0x10
-				loop small_loop
-			
-			mov ah, 2
-			mov dh, [cursor_y]
-			mov dl, [cursor_y]
-			mov bh, 0
-			int 0x10
-			sub word [offset_counter], 2
-			call prep_si
-			jmp inc_and_rerun_two
-	
-	ask_str2:
-		mov si, str2_str_string
-		jmp get_ask_string_before
- 
- 
-ext_str db 'ext', 0
+	mov ax, 0x0e48
+	int 0x10
+	mov al, 0x45
+	int 0x10
+	mov al, 0x4a
+	int 0x10
+	mov al, 0x4a
+	int 0x10
+	mov al, 0x50
+	int 0x10
+	jmp $
 	
 cmpsr_string_found:
-
-    mov word [tmp_cx], 1          ; Initialize tmp_cx to count string length
-    mov byte [strings_equal], 0
-    mov byte [strings_not_equal], 0
-
-    mov si, str1_str_string       ; Point SI to the first string
-    call find_zero                 ; Find the length of str1_str_string
-	mov dx, [tmp_cx]
-	mov si, str2_str_string
-	call find_zero
-	mov cx, [tmp_cx]
-
-find_zero_after:
-
-    mov si, str1_str_string       ; Reset SI to the start of str1
-    mov di, str2_str_string       ; Set DI to the start of str2
-
-    repe cmpsb                    ; Compare strings byte-by-byte
-    jne strings_are_not_equal         ; If CX is not zero, strings don't match
+	mov di, str1_str_string
+	mov bx, str2_str_string
+	dec bx
+	compare_that_string:
+		inc bx
+		mov al, [es:di]
+		cmp al, 0
+		je end_of_a_string
+		inc di
+		cmp al, [es:bx]
+		je compare_that_string
+		after_compared_string_false:
+		mov byte [es:jne_flag], 1
+		jmp inc_and_rerun_three
+	end_of_a_string:
+		cmp byte [es:bx], 0
+		jne after_compared_string_false
+		mov byte [es:jye_flag], 1
+		jmp inc_and_rerun_three
 	
-	mov cx, dx
-	repe cmpsb
-	jne strings_are_not_equal
-    ; If we get here, all bytes matched
-    mov byte [strings_equal], 1   ; Set strings_equal flag
-    jmp done_did_it
-
-strings_are_not_equal:
-    mov byte [strings_not_equal], 1 ; Set strings_not_equal flag
-	jmp inc_and_rerun_two
-
 	
-done_did_it:
-	mov byte [strings_equal], 1
-	jmp inc_and_rerun_two
-
-find_zero:
-    lodsb                         ; Load byte at DS:SI into AL, increment SI
-    cmp al, 0                     ; Check if AL is null (end of string)
-    je find_zero_after2            ; If null, go to find_zero_after
-    inc word [tmp_cx]             ; Increment string length
-    jmp find_zero                 ; Repeat until null byte is found
-	find_zero_after2:
-	ret
-
 	
 jgr_string_found:
-	cmp byte [jgr_flag], 1
-	jne inc_and_rerun_two
+	cmp byte [es:jgr_flag], 1
+	jne inc_and_rerun_three
+	
 	jmp jmp_string_found
 
 jne_string_found:
-	
-	cmp byte [strings_not_equal], 1
+	cmp byte [es:strings_not_equal], 1
 	je jmp_string_found
-
-	cmp byte [jne_flag], 1
+	cmp byte [es:jne_flag], 1
 	je jmp_string_found
 	
-	jmp inc_and_rerun_two
+	jmp inc_and_rerun_three
 
 jye_string_found:
-	
-	cmp byte [strings_equal], 1
+	cmp byte [es:strings_equal], 1
 	je jmp_string_found
 	
-	cmp byte [jye_flag], 1
+	cmp byte [es:jye_flag], 1
 	je jmp_string_found
 
-	jmp inc_and_rerun_two
+	jmp inc_and_rerun_three
 	
 jls_string_found:
-	cmp byte [jls_flag], 1
-	jne inc_and_rerun_two
+	cmp byte [es:jls_flag], 1
+	jne inc_and_rerun_three
 	jmp jmp_string_found
 	
 jmp_string_found:
-	
-	mov byte [jmp_counter], 1
+	add word [es:offset_counter], 4
 	call prep_si
-	call get_cmd
 	
-	
-	mov si, cmd_buf
+	;only numbers allowed
+	mov ax, si
 	call os_string_to_int
-	cmp al, 1
-	je first_line_thingy
-	mov [line_counter2], al
 	
 	
-	mov word [offset_counter], 43008
-	call prep_si
+	cmp ax, 0
+	je special_case_jump
 	
 	call go_to_first_line
-	repeat_jmp:
+	dec ax
+	mov cx, ax
+	loop_newlines:
+		push cx
+		call prep_si
+		call find_next_line_but_better
+		pop cx
+		loop loop_newlines
 	
-	call prep_si
-	call find_next_line
-
-	inc byte [jmp_counter]
-	mov al, [jmp_counter]
-	cmp al, [line_counter2]
-	
-	jl repeat_jmp
-	
-	
-	
-	mov byte [jye_flag], 0
-	mov byte [jne_flag], 0
-	mov byte [jls_flag], 0
-	mov byte [jgr_flag], 0
-	
-	jmp test_start
-	
-first_line_thingy:
-	mov word [offset_counter], 43008
-	call prep_si
-	call go_to_first_line
-	jmp test_start
-	
+	jmp test_start ;no need for inc_and_rerun_three because we already got to the desired line.
+	special_case_jump:
+		mov word [es:offset_counter], 0
+		call prep_si
+		call go_to_first_line
+		jmp test_start
 	
 cmp_string_found:
+	
+	;i dont want to do this
+	add word [es:offset_counter], 4
 	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
-	mov di, str1_str
-	mov byte [char4], 1
-	call test_string
-	je str1_cmp_first
-	
-	mov di, str2_str
-	mov byte [char4], 1
-	call test_string
-	je str2_cmp_first
-	
-	sub word [offset_counter], 5
-	call prep_si
-	call get_cmd
-	
-	call find_user_var_return
-	jnc user_var_cmp_first
 	
 	mov di, xxx_str
-	call test_string
-	je xxx_cmp_first
+	call test_test_string
+	jc cmp_xxx_before
 	
 	mov di, yyy_str
-	call test_string
-	je yyy_cmp_first
-	
-	jmp syntax_error_halt
-	
-	after_cmp:
-	
-	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
-	mov di, str1_str
-	mov byte [char4], 1
-	call test_string
-	je str1_cmp_second
-	
-	mov di, str2_str
-	mov byte [char4], 1
-	call test_string
-	je str2_cmp_second
-	
-	sub word [offset_counter], 5
-	call prep_si
-	call get_cmd
-	
-	mov di, xxx_str
-	call test_string
-	je xxx_cmp_second
-	
-	mov di, yyy_str
-	call test_string
-	je yyy_cmp_second
+	call test_test_string
+	jc cmp_yyy_before
 	
 	call find_user_var_return
-	jnc comparing
-	;must be a number. following along?
+	jnc cmp_var_before
+	;CANNOT BE A NUMBER. We MUST syntax error halt right here. 
+	jmp halt
+	cmp_secondary:
+	;this can be a number.
+	mov dx, [es:line_counter2]
+	inc dx
+	add [es:offset_counter], dx
+	call prep_si
+	mov di, xxx_str
+	call test_test_string
+	jc cmp_xxx_after
 	
-	mov si, cmd_buf
+	mov di, yyy_str
+	call test_test_string
+	jc cmp_yyy_after
+	
+	call find_user_var_return
+	jnc comparisons ;efficiency
+	
+	call prep_si
+	mov ax, si 
 	call os_string_to_int
-	
-	comparing:
-	mov bx, ax
-	mov ax, [placeholder]
-	cmp ax, bx
-	je equal_cmp
-	cmp ax, bx
-	jg greater_than_cmp
-	cmp ax, bx
-	jl less_than_cmp
+	;these functions will pass their value in AX, then we will check with [es:placeholder].
+	;yes, even xxx and yyy.
+	comparisons:
+	cmp ax, [es:placeholder]
+	je equal_comparison
+	mov byte [es:jne_flag], 1
+	second_comparison:
+	cmp ax, [es:placeholder]
+	jl greater_comparison
+	mov byte [es:jls_flag], 1
+	jmp inc_and_rerun_three
 
-	
-	sub word [offset_counter], 2
-	jmp inc_and_rerun_two
-	
-user_var_cmp_first:
-	call prep_si
-	call check_var_len_offset
-	mov [placeholder], ax
-	add word [offset_counter], 3
-	jmp after_cmp
-	
-str1_cmp_first:
-	mov di, str1_str_string
-	add di, [str1_offset]
-	mov bl, [di]
-	xor bh, bh
-	mov [placeholder], bx
-	jmp after_cmp
-str2_cmp_first:
-	mov di, str2_str_string
-	add di, [str2_offset]
-	mov bl, [di]
-	xor bh, bh
-	mov [placeholder], bx
-	jmp after_cmp
-
-str1_cmp_second:
-	mov di, str1_str_string
-	add di, [str1_offset]
-	mov al, [di]
-	xor ah, ah
-	jmp comparing
-str2_cmp_second:
-	mov di, str2_str_string
-	add di, [str2_offset]
-	mov al, [di]
-	xor ah, ah
-	jmp comparing
-	
-xxx_cmp_first:
-	mov bl, [cursor_x]
-	xor bh, bh
-	mov [placeholder], bx
-	jmp after_cmp
-yyy_cmp_first:
-	mov bl, [cursor_y]
-	xor bh, bh
-	mov [placeholder], bx
-	jmp after_cmp
-
-xxx_cmp_second:
-	mov al, [cursor_x]
-	xor ah, ah
-	jmp comparing
-yyy_cmp_second:
-	mov al, [cursor_y]
-	xor al, al
-	jmp comparing
-
-equal_cmp:
-	mov byte [jye_flag], 1
-	mov byte [jne_flag], 0
-	sub word [offset_counter], 2
-	jmp inc_and_rerun_two
-
-less_than_cmp:
-	mov byte [jls_flag], 1
-	sub word [offset_counter], 2
-	mov byte [jne_flag], 1
-	jmp inc_and_rerun_two
-greater_than_cmp:
-	mov byte [jne_flag], 1
-	mov byte [jgr_flag], 1
-	mov byte [jls_flag], 0
-	sub word [offset_counter], 2
-	jmp inc_and_rerun_two
+	cmp_xxx_before:
+		xor ah, ah
+		mov al, [es:cursor_x]
+		mov [es:placeholder], ax
+		mov word [es:line_counter2], 3
+		jmp cmp_secondary
+	cmp_yyy_before:
+		xor ah, ah
+		mov al, [es:cursor_y]
+		mov [es:placeholder], ax
+		mov word [es:line_counter2], 3
+		jmp cmp_secondary
+	cmp_var_before:
+		mov [es:placeholder], ax
+		jmp cmp_secondary
+	cmp_xxx_after:
+		xor ah, ah
+		mov al, [es:cursor_x]
+		jmp comparisons
+	cmp_yyy_after:
+		xor ah, ah
+		mov al, [es:cursor_y]
+		jmp comparisons
+	equal_comparison:
+		mov byte [es:jye_flag], 1
+		jmp inc_and_rerun_three
+	greater_comparison:
+		mov byte [es:jgr_flag], 1
+		jmp inc_and_rerun_three
 
 bel_string_found:
+	;first param is frequency, then amount of time to do that. 
+	add word [es:offset_counter], 4
 	call prep_si
-	call get_cmd
-	
 	call find_user_var_return
-	jnc bel_user_var
-	
-	mov si, cmd_buf
-	call os_string_to_int
-	
-	mov word [note_frequency], ax
-	
-	bel_after:
+	jnc bel_play_sound
 	
 	call prep_si
-	call get_cmd
-	
-	mov si, cmd_buf
+	mov ax, si
 	call os_string_to_int
 	
-	mov word [note_duration], ax
-	
+	bel_play_sound:
+	mov [es:placeholder], ax
 	call play_sound
-	mov word bx, [note_duration]
+	
+	bel_part_two:
+	add word [es:offset_counter], 4
+	call prep_si
+	call find_user_var_return
+	jnc delay_and_stop_note
+	call prep_si
+	mov ax, si
+	call os_string_to_int
+	
+	delay_and_stop_note:
+	mov bx, ax
 	call delay
 	call stop_note
+	jmp inc_and_rerun_three
 	
-	jmp inc_and_rerun_two
 	
-bel_user_var:
-	call check_var_len_offset
-	
-	mov [placeholder], ax
-	mov [placeholder2], al
-	
-	jmp bel_after
-				
 
 del_string_found:
+	add word [es:offset_counter], 4
 	call prep_si
-	call get_cmd
 	
 	call find_user_var_return
-	jnc del_user_var
+	jnc effient_delay
+	call prep_si ;effective reset of si.
 	
-	mov si, cmd_buf
+	;must be a number. I am not allowing you fools to wait for [es:cursor_x or y] amount of time. That is just stupid.
+	mov ax, si
 	call os_string_to_int
-	mov bx, ax
-	call delay
-	sub word [offset_counter], 2
-	jmp inc_and_rerun_two
-
-del_user_var:
-	call check_var_len_offset
-	mov bx, ax
-	call delay
-	jmp inc_and_rerun_two
-
-inc_string_found:	
-	call prep_si
-	call get_cmd
 	
+	effient_delay:
+	mov bx, ax 
+	call delay
+	
+	jmp inc_and_rerun_three ;Im a genius for this one
+	
+inc_string_found:
+	add word [es:offset_counter], 4
+	call prep_si
 	
 	mov di, xxx_str
-	call test_string
-	je xxx_inc
+	call test_test_string
+	jc inc_xxx
 	
 	mov di, yyy_str
-	call test_string
-	je yyy_inc
+	call test_test_string
+	jc inc_yyy
 	
 	call find_user_var_return
 	jnc inc_user_var
 	
-	sub word [offset_counter], 4
+	jmp halt
+	
+inc_xxx:
+	inc byte [es:cursor_x]
+	jmp inc_and_rerun_three
+
+inc_yyy:
+	inc byte [es:cursor_y]
+	jmp inc_and_rerun_three
+inc_user_var:
+	inc ax
+	mov bl, [es:tmp_var_loc]
+	xor bh, bh
+	jmp write_and_return
+
+dec_string_found:
+	add word [es:offset_counter], 4
 	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
-	mov byte [char4], 1
-	mov di, str1_str
-	call test_string
-	je inc_str1
-	
-	mov byte [char4], 1
-	mov di, str2_str
-	call test_string
-	je inc_str2
-	
-	jmp syntax_error_halt
-	
-	inc_str1:
-		inc word [str1_offset]
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-	
-	inc_str2:
-		inc word [str2_offset]
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-		
-	inc_user_var:
-		call check_var_len_offset
-		inc ax
-		xor bh, bh
-		mov bl, [tmp_var_loc]
-		jmp write_and_return
-		
-	xxx_inc:
-		inc byte [cursor_x]
-		dec word [offset_counter]
-		jmp inc_and_rerun_two
-	
-	yyy_inc:
-		inc byte [cursor_y]
-		dec word [offset_counter]
-		jmp inc_and_rerun_two
-	
-dec_string_found:	
-	call prep_si
-	call get_cmd
-	
 	
 	mov di, xxx_str
-	call test_string
-	je xxx_dec
+	call test_test_string
+	jc dec_xxx
 	
 	mov di, yyy_str
-	call test_string
-	je yyy_dec
+	call test_test_string
+	jc dec_yyy
 	
 	call find_user_var_return
 	jnc dec_user_var
 	
-	sub word [offset_counter], 4
-	call prep_si
-	mov byte [char4], 1
-	call get_cmd
+	jmp halt
 	
-	mov byte [char4], 1
-	mov di, str1_str
-	call test_string
-	je dec_str1
+dec_xxx:
+	dec byte [es:cursor_x]
+	jmp inc_and_rerun_three
+
+dec_yyy:
+	dec byte [es:cursor_y]
+	jmp inc_and_rerun_three
+dec_user_var:
+	dec ax
+	mov bl, [es:tmp_var_loc]
+	xor bh, bh
+	jmp write_and_return
 	
-	mov byte [char4], 1
-	mov di, str2_str
-	call test_string
-	je dec_str2
-	
-	jmp syntax_error_halt
-	
-	dec_str1:
-		dec word [str1_offset]
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-	
-	dec_str2:
-		dec word [str2_offset]
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-		
-	dec_user_var:
-		call check_var_len_offset
-		dec ax
-		xor bh, bh
-		mov bl, [tmp_var_loc]
-		jmp write_and_return
-		
-	xxx_dec:
-		dec byte [cursor_x]
-		dec word [offset_counter]
-		jmp inc_and_rerun_two
-	
-	yyy_dec:
-		dec byte [cursor_y]
-		dec word [offset_counter]
-		jmp inc_and_rerun_two
 		
 add_string_found:
+	add word [es:offset_counter], 4
 	call prep_si
-	call get_cmd
-	
-	mov di, cmd_buf
-	call find_user_var_return
-	jnc add_user_var_before
-	
-	mov si, cmd_buf
-	call os_string_to_int
-	
-	
-	mov word [placeholder], ax
-	mov byte [placeholder2], al
-	
-	add_after:
-	call prep_si
-	call get_cmd
 	
 	mov di, xxx_str
-	call test_string
-	je xxx_add
+	call test_test_string
+	jc add_take_xxx
 	
 	mov di, yyy_str
-	call test_string
-	je yyy_add
+	call test_test_string
+	jc add_take_yyy
+	
+	call find_user_var_return ;is there a var in the first param?
+	jnc add_var_to_placeholder
+	call prep_si
+	mov di, str1_str
+	call test_test_string
+	jc add_take_str1
+	
+	mov di, str2_str
+	call test_test_string
+	jc add_take_str2
+	call prep_si
+	mov ax, si
+	call os_string_to_int
+	
+	mov [es:placeholder], ax ;used for other stuff in this subroutine
+	
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 3
+	
+	add_afterwards:
+	mov dx, [es:line_counter2]
+	inc dx
+	add [es:offset_counter], dx
+	call prep_si
+	
+	mov di, xxx_str
+	call test_test_string
+	jc add_xxx_2
+	
+	mov di, yyy_str
+	call test_test_string
+	jc add_yyy_2
 	
 	call find_user_var_return
-	jnc add_user_var
+	jnc add_a_var_after
 	
-	jmp syntax_error_halt
+	call prep_si
+	mov di, str1_str
+	call test_test_string
+	jc add_str1_2
 	
-	add_user_var:
-		add ax, [placeholder]
-		xor bh, bh
-		mov bl, [tmp_var_loc]
-		jmp write_and_return
-		
-	xxx_add:
-		mov al, [placeholder2]
-		add [cursor_x], al
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
+	mov di, str2_str
+	call test_test_string
+	jc add_str2_2
 	
-	yyy_add:
-		mov al, [placeholder2]
-		add [cursor_y], al
-		jmp inc_and_rerun_two
-		
-	add_user_var_before:
-		call check_var_len_offset
-		
-		mov [placeholder], ax
-		mov [placeholder2], al
-		add word [offset_counter], 3
-		jmp add_after
-		
-		
+	jmp halt
+add_take_str1:
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	mov al, [es:di]
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 4
+	jmp add_afterwards
+add_take_str2:
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	mov al, [es:di]
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 4
+	jmp add_afterwards
+add_str1_2:
+	mov ax, [es:placeholder]
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	add [es:di], al
+	jmp inc_and_rerun_three
+add_str2_2:
+	mov al, [es:placeholder2]
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	add [es:di], al
+	jmp inc_and_rerun_three	
+	
+add_take_xxx:
+	mov al, [es:cursor_x]
+	mov [es:placeholder2], al 
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov word [es:line_counter2], 3
+	jmp add_afterwards
+add_take_yyy:
+	mov al, [es:cursor_x]
+	mov [es:placeholder2], al 
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov word [es:line_counter2], 3
+	jmp add_afterwards
+	
+add_xxx_2:
+	mov al, [es:placeholder2]
+	add [es:cursor_x], al 
+	jmp inc_and_rerun_three
+	
+add_yyy_2:
+	mov al, [es:placeholder2]
+	add [es:cursor_y], al 
+	jmp inc_and_rerun_three
+	
+add_var_to_placeholder:
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	call prep_si
+	jmp add_afterwards
+	
+add_a_var_after:
+	add ax, [es:placeholder]
+	mov bl, [es:tmp_var_loc]
+	xor bh, bh
+	jmp write_and_return
+
 sub_string_found:
+	add word [es:offset_counter], 4
 	call prep_si
-	call get_cmd
-	
-	call find_user_var_return
-	jnc sub_user_var_before
-	
-	mov si, cmd_buf
-	call os_string_to_int
-	
-	mov word [placeholder], ax
-	mov byte [placeholder2], al
-	
-	sub_after:
-	call prep_si
-	call get_cmd
 	
 	mov di, xxx_str
-	call test_string
-	je xxx_sub
+	call test_test_string
+	jc sub_take_xxx
 	
 	mov di, yyy_str
-	call test_string
-	je yyy_sub
+	call test_test_string
+	jc sub_take_yyy
 	
-	call find_user_var_return
-	jnc sub_user_var
+	call find_user_var_return ;is there a var in the first param?
+	jnc sub_var_to_placeholder
 	
-	jmp syntax_error_halt
-	
-	sub_user_var:
-		sub ax, [placeholder]
-		mov bl, [tmp_var_loc]
-		xor bh, bh
-		jmp write_and_return
-		
-	xxx_sub:
-		mov al, [placeholder2]
-		sub [cursor_x], al
-		jmp inc_and_rerun_two
-	
-	yyy_sub:
-		mov al, [placeholder2]
-		sub [cursor_y], al
-		jmp inc_and_rerun_two
-		
-	sub_user_var_before:
-		call check_var_len_offset
-		
-		mov [placeholder], ax
-		mov [placeholder2], al
-		add word [offset_counter], 3
-		jmp sub_after
-
-mov_string_found:
 	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
 	mov di, str1_str
-	mov byte [char4], 1
-	call test_string
-	je str1_mov_first
+	call test_test_string
+	jc sub_take_str1
 	
 	mov di, str2_str
-	mov byte [char4], 1
-	call test_string
-	je str2_mov_first
-	mov ax, [tmp_cx]
-	sub ax, 3
-	sub word [offset_counter], ax
+	call test_test_string
+	jc sub_take_str2
+	
 	call prep_si
-	call get_cmd
-	
-	call find_user_var_return
-	jnc mov_user_var_before
-	
-	;must be a number, well, until I tried to make a lock program.
-	;Now, we just have to do one more tiny little check to see if there is a "
-	;which means to save a string to a string, you know?
-	
-	mov si, cmd_buf
-	cmp byte [si], '"'
-	je found_quotes
+	mov ax, si
 	call os_string_to_int
-	mov [placeholder], ax
-	mov [placeholder2], al
 	
-	mov_after:
+	mov [es:placeholder], ax ;used for other stuff in this subroutine
 	
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 3
+	
+	sub_afterwards:
+	mov dx, [es:line_counter2]
+	inc dx
+	add [es:offset_counter], dx
 	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
-
-	
-	
-	mov di, str1_str
-	mov byte [char4], 1
-	call test_string
-	je str1_mov_second
-	
-	mov di, str2_str
-	mov byte [char4], 1
-	call test_string
-	je str2_mov_second
-	
-	mov ax, [tmp_cx]
-	sub ax, 3
-	sub word [offset_counter], ax
-	call prep_si
-	call get_cmd
-	
-	
 	
 	mov di, xxx_str
-	call test_string
-	je mov_xxx
+	call test_test_string
+	jc sub_xxx_2
 	
 	mov di, yyy_str
-	call test_string
-	je mov_yyy
+	call test_test_string
+	jc sub_yyy_2
 	
 	call find_user_var_return
-	jnc mov_user_var_second
-	jmp syntax_error_halt
+	jnc sub_a_var_after
 	
-	found_quotes:
+	call prep_si
+	mov di, str1_str
+	call test_test_string
+	jc sub_str1_2
+	
+	mov di, str2_str
+	call test_test_string
+	jc sub_str2_2
+	
+	jmp halt
+	
+sub_take_str1:
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	mov al, [es:di]
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 4
+	jmp sub_afterwards
+sub_take_str2:
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	mov al, [es:di]
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 4
+	jmp sub_afterwards
+sub_str1_2:
+	mov ax, [es:placeholder]
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	sub [es:di], al
+	jmp inc_and_rerun_three
+sub_str2_2:
+	mov al, [es:placeholder2]
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	sub [es:di], al
+	jmp inc_and_rerun_three	
+	
+sub_take_xxx:
+	mov al, [es:cursor_x]
+	mov [es:placeholder2], al 
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov word [es:line_counter2], 3
+	jmp sub_afterwards
+sub_take_yyy:
+	mov al, [es:cursor_x]
+	mov [es:placeholder2], al 
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov word [es:line_counter2], 3
+	jmp sub_afterwards
+	
+sub_xxx_2:
+	mov al, [es:placeholder2]
+	sub [es:cursor_x], al 
+	jmp inc_and_rerun_three
+	
+sub_yyy_2:
+	mov al, [es:placeholder2]
+	sub [es:cursor_y], al 
+	jmp inc_and_rerun_three
+	
+sub_var_to_placeholder:
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	call prep_si
+	jmp sub_afterwards
+	
+sub_a_var_after:
+	xchg ax, [es:placeholder]
+	sub ax, [es:placeholder]
+	mov bl, [es:tmp_var_loc]
+	xor bh, bh
+	jmp write_and_return
+
+mov_string_found: ;for strings: you can mov a string "hi" to a string storage area. Or, you can move a value to wherever the string offset it, or you can, using O as a prefix, set the offset.
+	add word [es:offset_counter], 4
+	call prep_si
+	
+	cmp byte [ds:si], '"' ;marks storing a string
+	je store_a_string
+	
+	cmp byte [ds:si], 'O' ;marks storing a string offset
+	je set_string_offset
+	
+	mov di, xxx_str
+	call test_test_string
+	jc mov_take_xxx
+	
+	mov di, yyy_str
+	call test_test_string
+	jc mov_take_yyy
+	
+	mov di, str1_str
+	call test_test_string
+	jc mov_take_str1
+	
+	mov di, str2_str
+	call test_test_string
+	jc mov_take_str2
+
+	call find_user_var_return ;is there a var in the first param?
+	jnc var_to_placeholder
+	
+	call prep_si
+	
+	mov ax, si
+	call os_string_to_int
+	
+	mov [es:placeholder], ax ;used for other stuff in this subroutine
+	
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], dx ;dx is amount of chars that the number was
+	
+	afterwards:
+	mov dx, [es:line_counter2]
+	inc dx
+	add [es:offset_counter], dx
+	call prep_si
+	
+	mov di, xxx_str
+	call test_test_string
+	jc mov_xxx_2
+	
+	mov di, yyy_str
+	call test_test_string
+	jc mov_yyy_2
+	
+	mov di, str1_str
+	call test_test_string
+	jc mov_str1_2
+	
+	mov di, str2_str
+	call test_test_string
+	jc mov_str2_2
+	
+	call find_user_var_return
+	jnc mov_a_var_after
+	jmp halt
+	
+mov_take_str1:
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	xor ah, ah
+	mov al, [es:di]
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 4
+	jmp afterwards
+mov_take_str2:
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	xor ah, ah
+	mov al, [es:di]
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	mov word [es:line_counter2], 4
+	jmp afterwards
+	
+mov_str1_2:
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	mov al, [es:placeholder2]
+	mov [es:di], al
+	jmp inc_and_rerun_three
+mov_str2_2:
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	mov al, [es:placeholder2]
+	mov [es:di], al
+	jmp inc_and_rerun_three
+	
+mov_take_xxx:
+	mov al, [es:cursor_x]
+	mov [es:placeholder2], al 
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov word [es:line_counter2], 3
+	jmp afterwards
+mov_take_yyy:
+	mov al, [es:cursor_x]
+	mov [es:placeholder2], al 
+	xor ah, ah
+	mov [es:placeholder], ax
+	mov word [es:line_counter2], 3
+	jmp afterwards
+	
+	
+mov_xxx_2:
+	mov al, [es:placeholder2]
+	mov [es:cursor_x], al 
+	jmp inc_and_rerun_three
+	
+mov_yyy_2:
+	mov al, [es:placeholder2]
+	mov [es:cursor_y], al 
+	jmp inc_and_rerun_three
+	
+var_to_placeholder:
+	mov [es:placeholder], ax
+	mov [es:placeholder2], al
+	call prep_si
+	jmp afterwards
+	
+mov_a_var_after:
+	mov ax, [es:placeholder]
+	mov bl, [es:tmp_var_loc]
+	xor bh, bh
+	jmp write_and_return
+	
+store_a_string:
+	mov dx, [es:offset_counter]
+	call prep_si
+	call find_next_line;genius move right here
+	call prep_si
+	sub word [es:offset_counter], 6
+	sub si, 6
+	
+	mov di, str1_str
+	call test_test_string
+	jc after_found_string1_store
+	
+	mov di, str2_str
+	call test_test_string
+	jnc halt
+	
+	;must be string 2
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	jmp save_the_string
+	
+	after_found_string1_store:
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	
+	save_the_string:
+		mov [es:offset_counter], dx
 		call prep_si
-		sub si, 3 ;we were at the "
-		sub word [offset_counter], 3
-		mov di, prt_string
+		inc si ;we were at the "
+		mov [es:offset_counter], si
 		save_loop:
-			lodsb
-			inc word [offset_counter]
-			stosb
+			mov al, [ds:si]
+			inc si
 			cmp al, '"'
-			jne save_loop
-			mov byte [di-1], 0
-			inc word [offset_counter]
-			
-			mov byte [char4], 1
+			je done_saving
+			mov [es:di], al
+			inc di
+			jmp save_loop
+		done_saving:
+			mov byte [es:di], 0
 			call prep_si
-			call get_cmd
-			
-			
-			mov di, str1_str
-			mov byte [char4], 1
-			call test_string
-			je copy_to_str1
-			
-			mov di, str2_str
-			mov byte [char4], 1
-			call test_string
-			je copy_to_str2
-			
-			jmp syntax_error_halt
-			
-	copy_to_str1:
-		mov si, prt_string
-		mov di, str1_str_string
-		jmp save_loop3
-		
-		copy_to_str2:
-
-		mov si, prt_string
-		mov di, str2_str_string
-		
-		save_loop3:
-			lodsb
-			cmp al, 0
-			je done_storing1
-			stosb
-			jmp save_loop3
-		done_storing1:
-		mov byte [di], 0
-		
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-			
-			
-			
+			jmp inc_and_rerun_three
 	
-	str1_mov_first:
-		mov di, str1_str_string
-		add di, [str1_offset]
-		mov al, [di]
-		mov [placeholder2], al
-		xor ah, ah
-		mov [placeholder], ax
-		jmp mov_after
-	str2_mov_first:
-		mov di, str2_str_string
-		add di, [str2_offset]
-		mov al, [di]
-		mov [placeholder2], al
-		xor ah, ah
-		mov [placeholder], ax
-		jmp mov_after
-		
-	str1_mov_second:
-		mov al, [placeholder2]
-		mov di, str1_str_string
-		add di, [str1_offset]
-		mov [di], al
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-	str2_mov_second:
-		mov al, [placeholder2]
-		mov di, str2_str_string
-		add di, [str2_offset]
-		mov [di], al
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
+set_string_offset:
+	inc word [es:offset_counter]
+	call prep_si
+	mov di, str1_str
+	call test_test_string
+	jc store_offset_placeholder_str1
+	mov di, str2_str
+	call test_test_string
+	jc store_offset_placeholder_str2
+	call find_user_var_return
+	jnc mov_hix_to_dl
 	
-	mov_user_var_before:
-		mov [placeholder], ax
-		mov [placeholder2], al
-		jmp mov_after
-	mov_user_var_second:
-		mov ax, [placeholder]
-		xor bh, bh
-		mov bl, [tmp_var_loc]
-		jmp write_and_return
-		
-	mov_xxx:
-		mov al, [placeholder2]
-		mov [cursor_x], al
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-	mov_yyy:
-		mov al, [placeholder2]
-		mov [cursor_y], al
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
+	mov ax, si
+	call os_string_to_int
+	mov dl, al
+	afterwards_offset:
+	add word [es:offset_counter], 4
+	call prep_si
+	mov di, str1_str
+	call test_test_string
+	jc mov_offset_to_str1
 	
-
+	mov di, str2_str
+	call test_test_string
+	jnc halt
+		mov [es:str2_offset], dl
+		jmp inc_and_rerun_three
+	mov_offset_to_str1:
+		mov [es:str1_offset], dl
+		jmp inc_and_rerun_three
+	store_offset_placeholder_str1:
+		mov ax, [es:str1_offset]
+		mov [es:placeholder], ax
+		mov [es:placeholder2], al
+		mov word [es:line_counter2], 4
+		jmp afterwards
+	store_offset_placeholder_str2:
+		mov ax, [es:str2_offset]
+		mov [es:placeholder], ax
+		mov [es:placeholder2], al
+		mov word [es:line_counter2], 4
+		jmp afterwards
+	mov_hix_to_dl:
+		mov dl, al
+		jmp afterwards_offset
+	
 prt_string_found:
-	cmp byte [cursor_y], 24
+	cmp byte [es:cursor_y], 24
 	jle dont_set_cursor
-	mov byte [cursor_y], 24
+	mov byte [es:cursor_y], 24
 	dont_set_cursor:
 	mov ah, 0x02
-	mov dl, [cursor_x]
-	mov dh, [cursor_y]
+	mov dl, [es:cursor_x]
+	mov dh, [es:cursor_y]
 	mov bh, 0
 	int 0x10
-	mov al, 0
-	mov cx, 59
-	mov di, prt_string
-	rep stosb
+	add word [es:offset_counter], 4
 	call prep_si
 	lodsb
-
-	inc word [offset_counter]
+	
 	cmp al, '"'
 	je print_a_string
 	
-	dec word [offset_counter]
 	call prep_si
-	call get_cmd
 	
 	call find_user_var_return
-	jnc print_a_user_var
-	
-	sub word [offset_counter], 4
+	jnc found_a_var_to_print
 	
 	call prep_si
-	mov byte [char4], 1
-	call get_cmd
-	
-	mov byte [char4], 1
 	mov di, str1_str
-	call test_string
-	je str1_print
+	call test_test_string
+	jc print_str1
 	
-	mov byte [char4], 1
 	mov di, str2_str
-	call test_string
-	je str2_print
+	call test_test_string
+	jc print_str2
 	
-	jmp syntax_error_halt
-		
-	print_a_user_var:
-		call os_int_to_string
-		sub word [offset_counter], 2
-		
-	end_print_num:
-		mov di, ax
-		call print
-		jmp inc_and_rerun_two
+	jmp halt
+print_str1:
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	call print
+	jmp inc_and_rerun_three
+print_str2:
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	call print
+	jmp inc_and_rerun_three
+
+print_a_string:
+		inc word [es:offset_counter]
+		print_out_the_string:
+			lodsb
+			inc word [es:offset_counter]
+			cmp al, '"'
+			je done_printing
+			mov ah, 0eh
+			int 0x10
+			jmp print_out_the_string
+			done_printing:
+				jmp inc_and_rerun_three
+			
 	
-	print_a_string:
-		call prep_si
-		mov di, prt_string
-	get_print_string:
-		lodsb
-		cmp al, '"'
-		je done_get_print_string
-		stosb
-		inc word [offset_counter]
-		jmp get_print_string
 	
-	done_get_print_string:
-	mov di, prt_string
+found_a_var_to_print:
+	call os_int_to_string ;var data already in ax, so we convert to string and print it.
+	mov di, ax
 	call print
 	
-	jmp inc_and_rerun_two
+	sub word [es:offset_counter], 2
+	call prep_si
+	jmp inc_and_rerun_three
 	
-	str1_print:
-		mov di, str1_str_string
-		add di, [str1_offset]
-		call print
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-		
-	str2_print:
-		mov di, str2_str_string
-		add di, [str2_offset]
-		call print
-		sub word [offset_counter], 2
-		jmp inc_and_rerun_two
-
+	
+	
 prep_si:
 	xor si, si
-	mov si, [offset_counter]
+	mov si, [es:offset_counter]
 	ret
+	
+inc_and_rerun_three:
+	sub word [offset_counter], 2
+	
+	call prep_si
+	call find_next_line_but_better ;should be all we need
+	jc halt
+	call prep_si
+	
+	
+	jmp test_start
+	
 
 inc_and_rerun_two:
 	call os_seed_random
@@ -1431,69 +1356,27 @@ inc_and_rerun_two:
 ;so simple
 
 find_next_line: ;with check
+	jmp find_next_line_but_better
 
-	cmp byte [si-2], 32
-	je special_check
-	cmp byte [si], 10 ;checks for 0x0a (COMES FIRST)
-	je found_next_line_and_add
-	cmp byte [si], 13
-	je found_next_line_and_add
-	inc si ;checks again
-	inc word [offset_counter]
-	cmp si, [end_of_file]
-	jge halt
-	call os_seed_random
-	jmp find_next_line
 
-found_next_line_and_add:
-	add word [offset_counter], 1
-	call prep_si
-
-	cmp byte [si], 13
-	je find_next_line
-	cmp byte [si], 10
-	je find_next_line
-	cmp byte [si], 0
-	je find_next_line
-	cmp si, [end_of_file]
-	jge halt
-	ret
-
-special_check:
-	add word [offset_counter], 1
-	call prep_si
-	cmp byte [si], 10
-	jne find_next_line
-	jmp found_next_line_and_add
 	
 go_to_first_line:
-	mov word [offset_counter], 43008
-	first_line_loop:
+	mov word [es:offset_counter], 0
 	call prep_si
-	cmp byte [si], 32
-	je special_first
-	cmp byte [si], 10
-	jl found_first_line
-	cmp byte [si], 13
-	jg found_first_line
-	cmp byte [si], 11
-	je found_first_line
-	cmp byte [si], 12
-	je found_first_line
+	do_the_thing:
+	cmp byte [ds:si], 13
+	jne found_the_first_line
+	add si, 2
+	add word [es:offset_counter], 2
+	jmp do_the_thing
 	
-	inc si
-	inc word [offset_counter]
-	jmp first_line_loop
-	
-found_first_line:
+found_the_first_line:
+	clc
+	ret
+special_first_line:
+	stc
 	ret
 
-special_first:
-	add word [offset_counter], 3
-	call prep_si
-	cmp byte [si], 32
-	je special_first
-	jmp found_first_line
 
 get_cmd:
 	clc
@@ -1548,7 +1431,7 @@ set_5_cmd:
 
 
 print:
-	mov al, [di]
+	mov al, [es:di]
 	cmp al, 0
 	je done_di
 	mov ah, 0x0e
@@ -1559,6 +1442,9 @@ done_di:
 	ret
 
 test_string:
+	push ds
+	mov ax, 0x2000
+	mov ds, ax
 	mov si, cmd_buf
 
 	cmp byte [char4], 1
@@ -1572,6 +1458,7 @@ test_string:
 	repe cmpsb
 	mov byte [char5], 0
 	mov byte [char4], 0
+	pop ds
 	ret
 	
 do_five:
@@ -1595,7 +1482,7 @@ wait_loop:
     ret                ; Return after the delay
 
 play_sound:
-	mov word ax, [note_frequency]
+	mov ax, [es:placeholder]
 	; Multiply AX by 6.1 using fixed-point arithmetic with scaling factor of 10
 	; Result is in AX (16-bit, rounded)
 	
@@ -1654,7 +1541,7 @@ clear_but_ret:
 	mov dl, 0
 	int 0x10
 
-    mov ax, 0x0700  ; function 07, AL=0 means scroll whole window
+    mov ax, 0x0700  ; function 07, al=0 means scroll whole window
     mov bh, 0x07    ; character attribute = white on black
     mov cx, 0x0000  ; row = 0, col = 0
     mov dx, 0x184f  ; row = 24 (0x18), col = 79 (0x4f)
@@ -1663,92 +1550,84 @@ clear_but_ret:
     popa
 	ret
 	
-special_bum_thingy:
-	dec word [offset_counter]
-	jmp this_thingy_2
 
 find_user_var_return:
-	clc
-	cld
-	mov si, varnames
-	mov di, cmd_buf
-	
-	mov ax, cmd_buf
-	call os_string_length
 	
 	mov di, cmd_buf
-	cmp ax, 2
-	je special_bum_thingy
-	cmp ax, 3
-	je this_thingy
-	this_thingy_2:
-	add di, ax
 	mov cx, 3
-	sub cx, ax
-	sub word [offset_counter], cx
-	inc word [offset_counter]
-	mov al, ' '
-	rep stosb
-	mov [tmp_cx], ax ;temporary saves the length
-	this_thingy:
+	mov dx, 0
+	get_the_varnames:
+		lodsb
+		stosb
+		cmp al, 0dh
+		je stop_gettings
+		cmp al, 0
+		je stop_gettings
+		cmp al, 32
+		je stop_gettings
+		inc dx
+		loop get_the_varnames ;get the filename.
+	stop_gettings:
+		mov word [es:line_counter2], dx
+		mov di, cmd_buf
+		add di, dx
+		mov al, 32
+		repe stosb
+	
+		
+		
+		;now we have to go through varnames and see if it is a valid variable, three bytes at a time!
+		mov bx, cmd_buf
+		mov di, varnames
+		
+		mov dx, 0
+		mov cx, 3
+		mov ah, 0eh
+		compare_varnames:
+			mov al, [es:bx]
+			cmp al, [es:di]
+			jne not_equal_varchars
+			
+			mov al, [es:bx+1]
+			cmp al, [es:di+1]
+			jne not_equal_varchars
+			
+			mov al, [es:bx+2]
+			cmp al, [es:di+2]
+			jne not_equal_varchars
+			
 
-	mov si, varnames
-	mov byte [find_var], 0
+			shl dx, 1
+			mov di, es:varlocs
+			add di, dx
+			mov byte [es:tmp_var_loc], dl ;pretty sure this is how this works...
+			mov ax, [es:di] ;and it is! tmp_var_loc is used for writing back user variables. Kind of genius.
+			clc
+			ret
+			
+		not_equal_varchars:
+			inc dx
+			add di, 3
+			cmp dx, 30
+			jle compare_varnames
+			stc
+			ret
+			
+			
 
-	;loop for three, then if not equal, then increment placeholder2, then times it by three, reset si, and add that to si.
-	search_again:
-	mov si, varnames ;for some reason it doesn't like to re-init, so you got to multiply by three for every placeholder2.
-	;makes sense actually.
-	mov di, cmd_buf
-	
-	mov al, 3
-	mul byte [find_var]
-	xor ah, ah
-	add si, ax
-	
-	
-	mov cx, 3
-	repe cmpsb
-	je found_the_var
-	inc byte [find_var]
-	cmp byte [find_var], 29
-	jge no_user_var
-	jmp search_again
-		
-	found_the_var:
-		mov al, [find_var]
-		add [find_var], al
-		mov al, [find_var]
-		xor ah, ah
-		
-		xor si, si
-		mov si, varlocs
-		add si, ax
-		
-		mov [tmp_var_loc], al
-		
-		mov word ax, [si]
-		
-		clc
-		ret
-		
-	no_user_var:
-		stc
-		ret
-		
-find_var db 0
-		
 write_word_user_var:
-	mov si, varlocs
-	add si, bx
-	mov word [si], ax
+	mov dx, bx ;bx is our var data location.
+	mov bx, es:varlocs ;bx is the varlocs string.
+	add bx, dx
+	mov word [es:bx], ax
+
 	ret
 	
 write_and_return:
+	sub word [es:offset_counter], 4
 	call write_word_user_var
-	sub word [offset_counter], 3
 	call prep_si
-	jmp inc_and_rerun_two
+	jmp inc_and_rerun_three
 	
 	
 check_var_len_offset:
@@ -1780,24 +1659,24 @@ mov_str db 'mov', 0 ;move a value to a var
 add_str db 'add', 0 ;add a value to a var
 prt_str db 'prt', 0 ;print a var or a string
 sub_str db 'sub', 0 ;sub a value from a var
-clr_str db 'clr', 0 ;
-jmp_str db 'jmp', 0 ;jump to a line 
+clr_str db 'clr', 0 ; X
+jmp_str db 'jmp', 0 ;jump to a line  X 
 inc_str db 'inc', 0 ;add 1 to a value
 dec_str db 'dec', 0 ;sub 1 from a value
-cmp_str db 'cmp ', 0;compare a number and a var, OR var and a var
-jye_str db 'jye', 0 ;jump if equal
-jne_str db 'jne', 0 ;jump if not equal
+cmp_str db 'cmp', 0;compare a number and a var, OR var and a var X
+jye_str db 'jye', 0 ;jump if equal X
+jne_str db 'jne', 0 ;jump if not equal X
 hlt_str db 'hlt', 0 ;stop program instantly
 del_str db 'del', 0 ;delays for numbers ticks
-jgr_str db 'jgr', 0 ;jump if greater
-jls_str db 'jls', 0 ;jump if lesser
-non_str db 'non', 0 ;used for jump commands to skip the page changing process, making it faster
+jgr_str db 'jgr', 0 ;jump if greater X
+jls_str db 'jls', 0 ;jump if lesser X
+non_str db 'non', 0 ;used for jump commands to skip the page changing process, making it faster WOW THATS OLD
 rem_str db 'rem', 0 ;used to make comments, code is about 5 lines! (they are for identifying the command!!!)
-bel_str db 'bel', 0 ;two params, first is frequency which is either var or num, then set num for the second param
+bel_str db 'bel', 0 ;two params, first is frequency which is either var or num, then set num for the second param X
 getky_str db 'getky', 0 ;two params, key looking for in quotes, non if any, and then var to save to if first param is not non
 ask_str db 'ask', 0 ;takes in one param, and that is the string name. Either st1 or st2
-def_str db 'def', 0 ;one param, volatile up to 3 char variable defined and set to zero
-cmpsr_str db 'cmpsr', 0 ;no params as there is only two strings to compare
+def_str db 'def', 0 ;one param, volatile up to 3 char variable defined and set to zero X
+cmpsr_str db 'cmpsb', 0 ;no params as there is only two strings to compare WHY THE FREAK I NAMED IT 'CMPSR', I HAVE NO IDEA. CMPSB IS MUCH BETTER.
 rand_str db 'rnd', 0 ;takes in THREE PARAMS (scary) first two are bounds and last is variable to save it too (sorry no strings)
 int_str db 'int', 0 ;two params, first the string (with offset) that will be converted into an int at var param two.
 mul_str db 'mul', 0 ;two params
@@ -1805,14 +1684,15 @@ div_str db 'div', 0 ;two params
 ;error messages and hlt message
 syntax_error db 'Syntax error on line ', 0
 ;new variables test
-varnames db 60 dup('?'), 0
-varlocs times 30 db 0, 0x01 ;0x01 for testing idk
+varnames db 90 dup('?'), 0
+varlocs times 30 dw 0
 varcount db 0 ;should go up to 30
 tmp_var_loc db 0
 ;how vars will work: user stores a varname (3 chars OR until a newline char, if that case then pad with space in varnames), then it copies to the next availiable place in varnames if space, incrementing varcount
 ;if you want to retrieve a value, then you will search through varnames 3 chars at a time for the varname until you find it, incrementing a temporary value as you go
 ;then when you do that, add the temporary value to si when it points to varlocs, and then save the value to another temporary register.
 ;yay!
+;okay so varlocs is actually just the place to hold variable data
 
 ; Messages for successful commands
 
@@ -1844,7 +1724,7 @@ jye_flag db 0
 jne_flag db 0
 jgr_flag db 0
 jls_flag db 0
-offset_counter dw 43008
+offset_counter dw 0
 note_duration dw 0
 note_frequency dw 0
 tmp_cx dw 0
@@ -1857,8 +1737,8 @@ placeholder2 db 0
 prompt db '> ', 0
 
 input_string_thing db 'String: ', 0
-filename_buf times 12 db 0
-%include "./cdcmd/basicfunctions.asm"
+skibidi times 12 db 0
+%include "./extra/functions.asm"
 disk_buffer db 24576
 end_of_file dw 0
 ;this line count should not be anything but 1365. 
@@ -1866,4 +1746,5 @@ end_of_file dw 0
 ;just kidding x2 its 1706
 ;just kidding x3 its 1767
 ;just kidding x4 its 1795
+;just kidding x5 its 
 dirlist:

@@ -196,7 +196,12 @@ os_load_file:
 
 	call disk_convert_l2hts		; Make appropriate params for int 13h
 
+
+	mov bx, ds
+	mov es, bx
+	
 	mov bx, [.load_position]
+	
 
 
 	mov ah, 02			; AH = read sectors, AL = just read 1
@@ -577,6 +582,7 @@ os_file_exists:
 
 	push ax
 	call disk_read_root_dir
+	
 
 	pop ax				; Restore filename
 
@@ -604,7 +610,7 @@ disk_read_root_dir:
 	call disk_convert_l2hts
 
 	mov si, disk_buffer		; Set ES:BX to point to OS buffer
-	mov bx, ds
+	mov bx, 0x2000
 	mov es, bx
 	mov bx, si
 
@@ -620,6 +626,8 @@ disk_read_root_dir:
 
 	stc				; A few BIOSes do not set properly on error
 	int 13h				; Read sectors
+	
+	
 
 	jnc .root_dir_finished
 	call disk_reset_floppy		; Reset controller and try again
@@ -814,12 +822,12 @@ os_int_to_string:
 .pop:
 	pop dx				; Pop off values in reverse order, and add 48 to make them digits
 	add dl, '0'			; And save them in the string, increasing the pointer each time
-	mov [di], dl
+	mov [es:di], dl
 	inc di
 	dec cx
 	jnz .pop
 
-	mov byte [di], 0		; Zero-terminate string
+	mov byte [es:di], 0		; Zero-terminate string
 
 	popa
 	mov ax, .t			; Return location of string
