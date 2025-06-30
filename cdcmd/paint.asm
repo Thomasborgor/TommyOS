@@ -1,30 +1,51 @@
-[BITS 16]
-[ORG 0x2600]         ; The bootloader code starts at 0x7C00
-mov [bootdev], dl
-mov [SecsPerTrack], ax
-mov [Sides], bx
-cmp byte [si], 255
-je no_filename
-mov ah, 0x00     ; BIOS video service
-mov al, 0x13     ; Video mode 13h (320x200, 256 colors)
-int 0x10         ; BIOS interrupt for video services
+[bits 16]
+
+mov cx, 0x2000
+mov es, cx
+mov [es:SecsPerTrack], ax ;why not prefixed with ES:? because then I would have to change pretty much all of functions.asm.
+mov [es:Sides], bx
+mov [es:bootdev], dl
+
+
 mov di, filename_buf2
-save_filename:
+save_____that______filename:
 	lodsb
 	cmp al, 0
-	je no_more_chars
-	stosb
-	cmp di, 12
-	jl save_filename
-no_more_chars:
+	je donasd
+	mov [es:di], al
+	inc di
+	jmp save_____that______filename
+donasd:
+
+mov ax, 0x2000
+mov ds, ax
 
 mov ax, filename_buf2
 call os_file_exists
 jc afterdjdjdj
+
 mov ax, filename_buf2
 call os_print_pcx
-mov ax, 1000h			; Reset ES back to original value
+
+;the palette is in memory right now, so we just to to get it...
+mov ax, 36864
+mov ds, ax ;where we will get the stuff
+mov si, bx ;bx is where the start of the palette is
+mov ax, 0x2000
 mov es, ax
+mov di, pcx_palette
+mov cx, 768
+
+save_the_palette:
+	lodsb
+	mov [es:di], al
+	inc di
+	loop save_the_palette
+
+mov ax, 2000h			; Reset ES back to original value
+mov es, ax
+mov ds, ax
+mov byte [use_correct_pcx_palette], 1
 mov ax, filename_buf2
 call os_remove_file
 jmp after_the_thingy
@@ -33,8 +54,10 @@ mov si, no_file_name
 call os_print_string
 ret
 no_file_name db 'No input file specified.', 0
+filename_buf2 times 12 db 0
 
 afterdjdjdj:
+mov byte [use_correct_pcx_palette], 0
 mov ah, 0x00     ;This might seem weird, but it is correct because if there is no existing file, it prints rando data and we just clear that out!
 mov al, 0x13     
 int 0x10         
@@ -131,7 +154,7 @@ save_file_pcx:
 	call draw_dot
 	push ds
 	push es
-mov ax, 0xa000        ; DS = video segment
+	mov ax, 0xa000        ; DS = video segment
     mov ds, ax
     mov ax, 0x2000        ; ES = file buffer segment
     mov es, ax
@@ -213,10 +236,14 @@ exit_loop:
 	pop es ;file starts at 11080
 	pop ds
 	add di, 2
+	cmp byte [use_correct_pcx_palette], 1
+	je custom_palette
 
-    mov cx, 768             ; 256 colors
+    
     mov si, sample_palette  ; Address of sample palette
-
+	
+	after_custom_palette:
+	mov cx, 768             ; 256 colors
 write_palette:
     mov al, ds:[si]
 	mov es:[di], al
@@ -229,19 +256,21 @@ write_palette:
 	int 0x10
 	push di
 	mov ax, filename_buf2
-	call custom_create_file
+	call os_remove_file
 	pop di
-	jc error
 	mov cx, di;DO THIS================================
 	sub cx, file_buffer
 	mov bx, file_buffer
 	mov ax, filename_buf2
 	call os_write_file
 	jc error
-	ret
+	retf
 	
 
-filename_buf2 times 12 db 0
+custom_palette:
+	mov si, pcx_palette
+	jmp after_custom_palette
+
 
 
 sample_palette:
@@ -262,11 +291,12 @@ sample_palette:
 	db 192, 192, 0,;yellow
 	db 0xff, 0xff, 0xff ;white
 	times 720 db 0
+pcx_palette times 768 db 0
 	
 error:
     mov ax, 0x0003
     int 0x10
-    mov ax, 0x0e01
+    mov ax, 0x0e02
     int 0x10
     jmp $
 	
@@ -392,9 +422,11 @@ welcome db 'Welcome back!', 10, 13, 0
 temp_cx dw 0
 temp_dx dw 0
 temp_byte db 0
-file_buffer times 10000 db 0
+use_correct_pcx_palette db 0
+
 
 %include "./extra/functions.asm"
-disk_buffer db 24576
+disk_buffer equ 24576
 dirlist:
+file_buffer:
 delay:
