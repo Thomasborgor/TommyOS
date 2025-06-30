@@ -1893,6 +1893,7 @@ os_bcd_to_int:
 os_print_pcx:
 	mov cx, 36864			; Load PCX at 36864 (4K after program start)
 	call os_load_file ;loads file at cx:0x0000
+	
 
 
 	mov ah, 0			; Switch to graphics mode
@@ -1923,7 +1924,8 @@ single:
 	rep stosb			; And show it (or all of them)
 	cmp di, 64001
 	jb decode
-
+	
+	mov [tmp_location], si
 
 	mov dx, 3c8h			; Palette index register
 	mov al, 0			; Start at colour 0
@@ -1936,4 +1938,7 @@ setpal:
 	shr al, 2			; Palettes divided by 4, so undo
 	out dx, al			; Send to VGA controller
 	loop setpal
+	mov bx, [tmp_location]
 	ret
+	
+tmp_location dw 0 ;here we will store where the start of the palette is, then pass it back to the main program, if needed.
