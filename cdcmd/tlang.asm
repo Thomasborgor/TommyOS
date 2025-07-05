@@ -163,6 +163,7 @@ halt:
 	mov dl, 0
 	mov dh, 20
 	int 0x10
+	
 	retf
 	
 	
@@ -238,6 +239,22 @@ test_start:	;===================================================================
 	mov di, cmpsr_str
 	call test_test_string
 	jc cmpsr_string_found
+	
+	mov di, getky_str
+	call test_test_string
+	jc getky_string_found
+	
+	mov di, ask_str
+	call test_test_string
+	jc ask_string_found
+	
+	mov di, rand_str
+	call test_test_string
+	jc rand_string_found
+	
+	mov di, clr_str
+	call test_test_string
+	jc clr_string_found
 	
 	jmp halt
 	
@@ -321,98 +338,115 @@ convert_str2_int:
 	mov dx, ax
 	jmp after_intified
 	
+clr_string_found:
+	call clear_but_ret
+	add word [es:offset_counter], 3
+	jmp inc_and_rerun_three
+	
 rand_string_found:
 	call os_seed_random
+	add word [es:offset_counter], 4
 	call prep_si
-	call get_cmd
-	mov si, cmd_buf
+	mov ax, si
 	call os_string_to_int
-	mov [first_rand], ax
+	add word [es:offset_counter], dx
+	add si, dx
+	inc word [es:offset_counter]
+	inc si
+	
+	mov [es:first_rand], ax
 	call prep_si
-	call get_cmd
-	mov si, cmd_buf
+	mov ax, si
 	call os_string_to_int
+	add word [es:offset_counter], dx
+	add si, dx
+	inc word [es:offset_counter]
+	inc si
+	
 	mov bx, ax
-	mov ax, [first_rand]
+	mov ax, [es:first_rand]
 	call os_get_random
-	mov [first_rand], cx
+	
+	mov [es:first_rand], cx
 	
 	call prep_si
-	call get_cmd
-	
 	call find_user_var_return
-	jc syntax_error_halt
+	jc halt
 	
 	xor bh, bh
-	mov bl, [tmp_var_loc]
+	mov bl, [es:tmp_var_loc]
 	
-	mov ax, [first_rand]
+	mov ax, [es:first_rand]
 	jmp write_and_return
 	;cx has rand
 first_rand dw 0
 	
-getky_string_found: ;how this works: Two modes, wait and non wait. Wait includes the first param being a quote/number and nothing else.
-;Non wait has tecnically three params. first is a %, then where to jump if zero, and then a variable to save the keypress to.
+getky_string_found:
+	add word [es:offset_counter], 6
 	call prep_si
 	
-	cmp byte [si], '"'
-	je use_quotes
-	cmp byte [si], '%'
-	je use_non_blocking
+	cmp byte [ds:si], '"'
+	je getky_with_quotes
 	
-	call get_cmd
-	call find_user_var_return
-	jnc user_var_found_getky
-	
-	;must be a number
-	mov si, cmd_buf
+	cmp byte [ds:si], '%'
+	je get_nonwait
+	;we assume that there can only be a number right now,
+	;in which that is an ascii code to wait the corrosponding key to get pressed!
+	call prep_si
+	mov ax, si
 	call os_string_to_int
-	xor ah, ah
-	mov dl, al
-	wait_for_key_loop:
-		mov ah, 0 ;one thing, when specifying a number, you must wait. 
+	mov dl, al ;temp reg
+	wait_for_that_key_loop:
+		mov ah, 0
 		int 16h
-		cmp dl, al
-		jne wait_for_key_loop
 		
-	jmp inc_and_rerun_two
+		cmp dl, al
+		jne wait_for_that_key_loop
+	dec word [es:offset_counter]
+	jmp inc_and_rerun_three
 	
-	use_quotes:
-		inc word [offset_counter]
-		call prep_si
-		mov dl, [si]
-		jmp wait_for_key_loop
-	
-	user_var_found_getky:
-		;idk
-		;even though i made the coed i forgot how to do it ;)
-		mov ah, 0 ;skib
-		int 0x16
-		xor ah, ah
-		xor bh, bh
-		mov bl, [placeholder2]
-		call write_and_return
-use_non_blocking:
-	add word [offset_counter], 2
-	
-	mov ah, 0x01
-	int 0x16
-	jz jmp_string_found ;the param after is the jump param so we good
-	xor ah, ah
-	mov dx, ax
-	add word [offset_counter], 4
+getky_with_quotes:
+	inc si ; get past " and to the char we want.
+	lodsb
+	mov dl, al
+	jmp wait_for_that_key_loop
+
+get_nonwait:
+	add word [es:offset_counter], 2
 	call prep_si
-	call get_cmd
-	call find_user_var_return
-	jc syntax_error_halt
-	mov ax, dx
-	xor bh, bh
-	mov bl, [tmp_var_loc]
-	jmp write_and_return
+	
+		mov ah, 0x01
+		int 16h
+		jz there_was_no_keypress    ; wait for key press
+    
+		mov ah, 0x00
+		int 16h
+		;we save this character to the var defined.
+		mov [es:placeholder2], al
+		call find_user_var_return
+		jc halt
+		
+		xor ah, ah
+		mov al, [es:placeholder2]
+		xor bh, bh
+		mov bl, [es:tmp_var_loc]
+		jmp write_and_return
+		
+	there_was_no_keypress:
+		inc word [es:offset_counter]
+		call prep_si
+		cmp byte [ds:si], 32
+		jne there_was_no_keypress
+		inc word [es:offset_counter]
+		call prep_si
+		
+		jmp only_numbers_allowed
+	
 	
 def_string_found:
 	add word [es:offset_counter], 4
 	call prep_si
+
 
 	mov di, cmd_buf
 	mov cx, 3
@@ -431,7 +465,7 @@ def_string_found:
 		repe stosb
 	
 	
-	cmp byte [varcount], 30 ;checks if we are at 30 user vars
+	cmp byte [es:varcount], 30 ;checks if we are at 30 user vars
 	jge halt
 	
 	mov di, varnames
@@ -461,7 +495,7 @@ def_string_found:
 			;quotient in ax 
 			mov di, es:varlocs ;wow am i stupid. FOR SOME GOOFY REASON, every thing in this file when not using SI should be prefixed with ES:
 			add di, ax 
-			inc di ;why i need to do this just to init a var as 0, IDK but it works!
+			;inc di ;why i need to do this just to init a var as 0, IDK but it works!
 			;as is with everything in this codebase, am i right?
 			mov word [es:di], 0
 			
@@ -483,17 +517,73 @@ def_string_found:
 		jmp inc_and_rerun_three
 	
 ask_string_found:
-	mov ax, 0x0e48
+	add word [es:offset_counter], 4
+	call prep_si
+	
+	mov di, str1_str
+	call test_test_string
+	jc ask_str1
+	
+	mov di, str2_str
+	call test_test_string
+	jnc halt
+	
+	mov di, str2_str_string
+	add di, [es:str2_offset]
+	mov cx, 59
+	sub cx, [es:str2_offset]
+	
+	get_all_chars_loop_before:
+	
+	mov ah, 2
+	xor bh, bh
+	mov dx, 0x1500
 	int 0x10
-	mov al, 0x45
+	mov ax, 0x0e10
 	int 0x10
-	mov al, 0x4a
+	
+	get_all_chars_loop:
+		mov ah, 0
+		int 16h
+		
+		cmp al, 13
+		je done_storing_strings
+		cmp al, 8
+		je do_backspace
+		mov ah, 0eh
+		int 0x10
+		stosb
+		loop get_all_chars_loop
+		
+	done_storing_strings:
+	
+	mov ah, 2
+	xor bh, bh
+	mov dx, 0x1500
 	int 0x10
-	mov al, 0x4a
-	int 0x10
-	mov al, 0x50
-	int 0x10
-	jmp $
+	
+	mov cx, 59
+	mov ax, 0x0e20
+	rep_int_0x10:
+		int 0x10
+		loop rep_int_0x10
+	
+	sub word [es:offset_counter], 2
+	jmp inc_and_rerun_three
+	
+do_backspace:
+	dec di
+	mov di, backspace_msg
+	call print
+	inc cx
+	jmp get_all_chars_loop
+	
+ask_str1:
+	mov cx, 59
+	sub cx, [es:str1_offset]
+	mov di, str1_str_string
+	add di, [es:str1_offset]
+	jmp get_all_chars_loop_before
 	
 cmpsr_string_found:
 	mov di, str1_str_string
@@ -551,6 +641,7 @@ jmp_string_found:
 	call prep_si
 	
 	;only numbers allowed
+	only_numbers_allowed:
 	mov ax, si
 	call os_string_to_int
 	
@@ -576,7 +667,6 @@ jmp_string_found:
 		jmp test_start
 	
 cmp_string_found:
-	
 	;i dont want to do this
 	add word [es:offset_counter], 4
 	call prep_si
@@ -589,6 +679,7 @@ cmp_string_found:
 	call test_test_string
 	jc cmp_yyy_before
 	
+	call prep_si
 	call find_user_var_return
 	jnc cmp_var_before
 	;CANNOT BE A NUMBER. We MUST syntax error halt right here. 
@@ -626,6 +717,7 @@ cmp_string_found:
 	jmp inc_and_rerun_three
 
 	cmp_xxx_before:
+		
 		xor ah, ah
 		mov al, [es:cursor_x]
 		mov [es:placeholder], ax
@@ -1029,7 +1121,7 @@ mov_string_found: ;for strings: you can mov a string "hi" to a string storage ar
 	cmp byte [ds:si], '"' ;marks storing a string
 	je store_a_string
 	
-	cmp byte [ds:si], 'O' ;marks storing a string offset
+	cmp byte [ds:si], 'O'
 	je set_string_offset
 	
 	mov di, xxx_str
@@ -1153,6 +1245,7 @@ var_to_placeholder:
 	
 mov_a_var_after:
 	mov ax, [es:placeholder]
+	
 	mov bl, [es:tmp_var_loc]
 	xor bh, bh
 	jmp write_and_return
@@ -1203,48 +1296,71 @@ store_a_string:
 set_string_offset:
 	inc word [es:offset_counter]
 	call prep_si
+	
 	mov di, str1_str
 	call test_test_string
-	jc store_offset_placeholder_str1
+	jc take_offset_from_str1
+	
+	call prep_si
+	
 	mov di, str2_str
 	call test_test_string
-	jc store_offset_placeholder_str2
+	jc take_offset_from_str2
+	
+	call prep_si
 	call find_user_var_return
-	jnc mov_hix_to_dl
+	jnc take_user_var
+	
+	;must be a number
+	call prep_si
 	
 	mov ax, si
 	call os_string_to_int
-	mov dl, al
+	mov [es:line_counter2], dx
+	mov [es:placeholder2], al
+	
 	afterwards_offset:
-	add word [es:offset_counter], 4
+	mov dx, [es:line_counter2]
+	inc dx
+	add [es:offset_counter], dx
 	call prep_si
+	
 	mov di, str1_str
 	call test_test_string
-	jc mov_offset_to_str1
+	jc store_offset_at_str1
 	
 	mov di, str2_str
 	call test_test_string
 	jnc halt
-		mov [es:str2_offset], dl
-		jmp inc_and_rerun_three
-	mov_offset_to_str1:
-		mov [es:str1_offset], dl
-		jmp inc_and_rerun_three
-	store_offset_placeholder_str1:
-		mov ax, [es:str1_offset]
-		mov [es:placeholder], ax
-		mov [es:placeholder2], al
-		mov word [es:line_counter2], 4
-		jmp afterwards
-	store_offset_placeholder_str2:
-		mov ax, [es:str2_offset]
-		mov [es:placeholder], ax
-		mov [es:placeholder2], al
-		mov word [es:line_counter2], 4
-		jmp afterwards
-	mov_hix_to_dl:
-		mov dl, al
-		jmp afterwards_offset
+	
+	mov al, [es:placeholder2]
+	mov [es:str2_offset], al
+	sub word [es:offset_counter], 2
+	jmp inc_and_rerun_three
+	
+store_offset_at_str1:
+	mov al, [es:placeholder2]
+	mov [es:str1_offset], al
+	sub word [es:offset_counter], 2
+	call prep_si
+	jmp inc_and_rerun_three
+	
+take_user_var:
+	mov [es:placeholder2], al
+
+	jmp afterwards_offset
+	
+take_offset_from_str1:
+	mov al, [es:str1_offset]
+	thingy_thingy_thingy:
+	mov [es:placeholder2], al
+	mov byte [es:line_counter2], 4
+	jmp afterwards_offset
+take_offset_from_str2:
+	mov al, [es:str2_offset]
+	jmp thingy_thingy_thingy
+	
+	
 	
 prt_string_found:
 	cmp byte [es:cursor_y], 24
@@ -1532,24 +1648,15 @@ clear:
 
 clear_but_ret:
 	pusha
-	mov ah, 0x03
-	mov bh, 0x00 
-	int 0x10
-	
-	mov ah, 0x02
-	mov dh, 0
-	mov dl, 0
-	int 0x10
+	mov ah, 07h        ; Scroll up function
+	mov al, 0          ; Clear entire screen (scroll all lines)
+	mov bh, 0x07
+	mov cx, 0000h      ; Upper left corner (row 0, col 0)
+	mov dx, 184FH      ; Lower right corner (row 24, col 79)
+	int 10h
+	popa
 
-    mov ax, 0x0700  ; function 07, al=0 means scroll whole window
-    mov bh, 0x07    ; character attribute = white on black
-    mov cx, 0x0000  ; row = 0, col = 0
-    mov dx, 0x184f  ; row = 24 (0x18), col = 79 (0x4f)
-    int 0x10        ; call BIOS video interrupt
-
-    popa
 	ret
-	
 
 find_user_var_return:
 	
@@ -1578,11 +1685,10 @@ find_user_var_return:
 		
 		;now we have to go through varnames and see if it is a valid variable, three bytes at a time!
 		mov bx, cmd_buf
+		
 		mov di, varnames
 		
 		mov dx, 0
-		mov cx, 3
-		mov ah, 0eh
 		compare_varnames:
 			mov al, [es:bx]
 			cmp al, [es:di]
@@ -1595,12 +1701,24 @@ find_user_var_return:
 			mov al, [es:bx+2]
 			cmp al, [es:di+2]
 			jne not_equal_varchars
+		
 			
-
-			shl dx, 1
+			
+			mov ax, dx
+			;pusha
+			;call os_int_to_string
+			;mov di, ax
+			;call print
+			;mov ah, 0
+			;int 0x16
+			;popa
 			mov di, es:varlocs
 			add di, dx
-			mov byte [es:tmp_var_loc], dl ;pretty sure this is how this works...
+			add di, dx
+			
+			
+			mov [es:tmp_var_loc], dl ;pretty sure this is how this works...
+			
 			mov ax, [es:di] ;and it is! tmp_var_loc is used for writing back user variables. Kind of genius.
 			clc
 			ret
@@ -1616,10 +1734,10 @@ find_user_var_return:
 			
 
 write_word_user_var:
-	mov dx, bx ;bx is our var data location.
-	mov bx, es:varlocs ;bx is the varlocs string.
-	add bx, dx
-	mov word [es:bx], ax
+	mov di, es:varlocs
+	add di, bx
+	add di, bx
+	mov word [es:di], ax
 
 	ret
 	
@@ -1659,17 +1777,17 @@ mov_str db 'mov', 0 ;move a value to a var
 add_str db 'add', 0 ;add a value to a var
 prt_str db 'prt', 0 ;print a var or a string
 sub_str db 'sub', 0 ;sub a value from a var
-clr_str db 'clr', 0 ; X
-jmp_str db 'jmp', 0 ;jump to a line  X 
+clr_str db 'clr', 0 ;
+jmp_str db 'jmp', 0 ;jump to a line
 inc_str db 'inc', 0 ;add 1 to a value
 dec_str db 'dec', 0 ;sub 1 from a value
-cmp_str db 'cmp', 0;compare a number and a var, OR var and a var X
-jye_str db 'jye', 0 ;jump if equal X
-jne_str db 'jne', 0 ;jump if not equal X
+cmp_str db 'cmp', 0;compare a number and a var, OR var and a var
+jye_str db 'jye', 0 ;jump if equal
+jne_str db 'jne', 0 ;jump if not equal
 hlt_str db 'hlt', 0 ;stop program instantly
 del_str db 'del', 0 ;delays for numbers ticks
-jgr_str db 'jgr', 0 ;jump if greater X
-jls_str db 'jls', 0 ;jump if lesser X
+jgr_str db 'jgr', 0 ;jump if greater
+jls_str db 'jls', 0 ;jump if lesser
 non_str db 'non', 0 ;used for jump commands to skip the page changing process, making it faster WOW THATS OLD
 rem_str db 'rem', 0 ;used to make comments, code is about 5 lines! (they are for identifying the command!!!)
 bel_str db 'bel', 0 ;two params, first is frequency which is either var or num, then set num for the second param X
@@ -1679,8 +1797,7 @@ def_str db 'def', 0 ;one param, volatile up to 3 char variable defined and set t
 cmpsr_str db 'cmpsb', 0 ;no params as there is only two strings to compare WHY THE FREAK I NAMED IT 'CMPSR', I HAVE NO IDEA. CMPSB IS MUCH BETTER.
 rand_str db 'rnd', 0 ;takes in THREE PARAMS (scary) first two are bounds and last is variable to save it too (sorry no strings)
 int_str db 'int', 0 ;two params, first the string (with offset) that will be converted into an int at var param two.
-mul_str db 'mul', 0 ;two params
-div_str db 'div', 0 ;two params
+
 ;error messages and hlt message
 syntax_error db 'Syntax error on line ', 0
 ;new variables test

@@ -20,8 +20,9 @@ not:
 	
 	@echo "Creating floppy image..."
 	mkdosfs -C floppy.img 1440 -F12 -n TOMMYOS
-	mkdosfs -C image2.img 1440
-	mkdosfs -C mydisk.img 2880 -F12 -M0xF8 
+	mkdosfs -C image2.img 2880 -F12
+	mkdosfs -C mydisk.img 2880 -F12 -M0xF8
+	#mkdosfs -C mydisk.img 1440 -F12
 	mcopy -i mydisk.img ./extra/test.txt ::TEST.TXT
 	dd if=./boot/bootloader.bin of=floppy.img bs=512 conv=notrunc status=noxfer
 	mcopy -i floppy.img kernel.bin ::KERNEL.BIN
@@ -38,7 +39,8 @@ not:
 	mcopy -i floppy.img ./photos/bear1.pcx ::BEAR1.PCX
 	mcopy -i floppy.img ./photos/bear2.pcx ::BEAR2.PCX
 	mcopy -i floppy.img ./extra/basic.txt ::BASIC.TXT
-	mcopy -i floppy.img ./extra/doogle.bin ::32.bin
+	mcopy -i mydisk.img ./extra/doogle.bin ::32.bin
+	mcopy -i mydisk.img ./cdcmd/write.bin ::WRITE.BIN
 	clear
 	
 commit:
@@ -49,10 +51,10 @@ commit:
 
 hard: 
 
-	qemu-system-x86_64 -hda mydisk.img
+	qemu-system-x86_64 -boot order=c -hda mydisk.img -hdb image2.img
 
 small:
-	qemu-system-x86_64 -boot order=a -fda floppy.img
+	qemu-system-x86_64 -boot order=a -fda floppy.img -drive file=mydisk.img,if=ide,index=1
 
 	clear
 	
