@@ -176,6 +176,11 @@ write_file_get_loop:
     add si, 160
     cmp si, 160*25
     jle write_file_get_loop
+	
+	add word [ds:b800_offset], 2000
+	cmp word [ds:b800_offset], 0xb800 + (2000 * 8)
+	je prepare_write_file_get_loop
+	
 
 call trim_crlf_from_write_buffer
 
@@ -198,7 +203,12 @@ call os_write_file
 
 retf
 
-	
+b800_offset dw 0xb800
+
+prepare_write_file_get_loop:
+	xor si, si
+	mov es, [ds:b800_offset]
+	jmp write_file_get_loop
 	
 ; In: si = screen offset, di = output buffer
 ; Out: buffer_buffer contains trimmed row + CRLF
