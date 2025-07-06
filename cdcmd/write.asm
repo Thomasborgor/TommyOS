@@ -105,10 +105,119 @@ prepare_the_screen:
 		cmp al, '~'
 		je write_file
 		
+		cmp ah, 0x48  ; Up arrow
+		je up_key
+		
+		cmp ah, 0x50  ; Down arrow
+		je down_key
+		
+		cmp ah, 0x4B  ; Left arrow
+		je left_key
+		
+		cmp ah, 0x4D  ; Right arrow
+		je right_key
+		
 		;im not adding arrow keys yet
 		mov ah, 0eh
 		int 0x10
 		jmp get_keystroke
+	
+	up_key:
+    ; Get cursor position
+    mov ah, 0x03
+    mov bh, [current_page]
+    int 0x10
+
+    ; Check if at the top of the current page
+    cmp dh, 0x00
+    jne move_cursor_up
+
+    ; Check if there is a previous page
+    cmp byte [current_page], 0
+    je get_keystroke                 ; Already at the first page, no further scrolling
+
+    ; Move to the previous page
+    dec byte [current_page]
+    mov ah, 0x05                ; Set active display page
+    mov al, [current_page]
+    int 0x10
+
+    ; Move cursor to the last line of the new page
+    mov dh, 24
+    mov dl, 0
+    mov ah, 0x02
+    mov bh, [current_page]
+    int 0x10
+    jmp get_keystroke
+
+move_cursor_up:
+    ; Move cursor up within the page
+    dec dh
+    mov ah, 0x02
+    mov bh, [current_page]
+    int 0x10
+    jmp get_keystroke
+
+down_key:
+    ; Get cursor position
+    mov ah, 0x03
+    mov bh, [current_page]
+    int 0x10
+
+    ; Check if at the bottom of the current page
+    cmp dh, 24
+    jne move_cursor_down
+
+    ; Check if there is a next page
+    cmp byte [current_page], 6 ;sneaky leaving the last page
+    je get_keystroke                 ; Already at the last page, no further scrolling
+
+    ; Move to the next page
+    inc byte [current_page]
+    mov ah, 0x05                ; Set active display page
+    mov al, [current_page]
+    int 0x10
+
+    ; Move cursor to the top of the new page
+    mov dh, 0
+    mov dl, 0
+    mov ah, 0x02
+    mov bh, [current_page]
+    int 0x10
+    jmp get_keystroke
+
+move_cursor_down:
+    ; Move cursor down within the page
+    inc dh
+    mov ah, 0x02
+    mov bh, [current_page]
+    int 0x10
+    jmp get_keystroke
+
+right_key:
+	mov ah, 0x03
+	mov bh, [current_page]
+	int 0x10
+	mov ah, 0x02
+	int 0x10
+	cmp dl, 0x4F  ; Prevent moving past the last column (79th column)
+	je get_keystroke
+	inc dl
+	int 0x10
+	jmp get_keystroke
+	
+left_key:
+	mov ah, 0x03
+	mov bh, [current_page]
+	int 0x10
+	mov ah, 0x02
+	int 0x10
+	cmp dl, 0x00  ; Prevent moving before the first column
+	je get_keystroke
+	dec dl
+	int 0x10
+	jmp get_keystroke
+	
 
 	backspace_do:
 		call check_for_left_side_cursor
