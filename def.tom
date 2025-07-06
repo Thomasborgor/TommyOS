@@ -1,12 +1,4 @@
-prt "TommyOS LOCK"
-inc yyy
-prt "very secure"
-inc yyy
-mov "tt749310" str1
-ask str2
-cmpsb
-jye 012
-prt "Incorrect!"
-inc yyy
-jmp 006
-prt "Correct!"
+def var
+mov "123" str1
+int str1 var
+prt var

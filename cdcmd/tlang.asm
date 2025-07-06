@@ -256,6 +256,10 @@ test_start:	;===================================================================
 	call test_test_string
 	jc clr_string_found
 	
+	mov di, int_str
+	call test_test_string
+	jc int_string_found
+	
 	jmp halt
 	
 syntax_error_halt:
@@ -296,47 +300,48 @@ syntax_error_halt:
 
 	
 int_string_found:
-	mov byte [char4], 1
+	add word [es:offset_counter], 4
 	call prep_si
-	call get_cmd
 	
-	mov byte [char4], 1
 	mov di, str1_str
-	call test_string
-	je convert_str1_int
+	call test_test_string
+	jc interize_str1
 	
-	mov byte [char4], 1
 	mov di, str2_str
-	call test_string
-	je convert_str2_int
+	call test_test_string
+	jnc halt
 	
-	after_intified:
+	mov si, str2_str_string
+	add si, [es:str2_offset]
 	
+	
+	thingyd:
+	push ds
+	mov ax, 0x2000
+	mov ds, ax
+	
+	call os_string_to_int
+	pop ds
+	
+	mov [es:tmp_cx], ax
+	
+	add word [es:offset_counter], 5
 	call prep_si
-	call get_cmd
 	
 	call find_user_var_return
-	jc syntax_error_halt
+	jc halt
 	
-	;value in ax but we don't care
-	mov ax, dx
-	mov bh, 00
-	mov bl, [tmp_var_loc]
+	mov ax, [es:tmp_cx]
+	mov bl, [es:tmp_var_loc]
+	xor bh, bh
 	jmp write_and_return
 	
-convert_str1_int:
+interize_str1:
 	mov si, str1_str_string
-	add si, [str1_offset]
-	call os_string_to_int
-	mov dx, ax
-	jmp after_intified
+	add si, [es:str1_offset]
+	jmp thingyd
 	
-convert_str2_int:
-	mov si, str2_str_string
-	add si, [str2_offset]
-	call os_string_to_int
-	mov dx, ax
-	jmp after_intified
+	
 	
 clr_string_found:
 	call clear_but_ret
