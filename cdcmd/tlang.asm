@@ -669,6 +669,12 @@ jmp_string_found:
 		mov word [es:offset_counter], 0
 		call prep_si
 		call go_to_first_line
+		
+		mov byte [es:jye_flag], 0
+		mov byte [es:jne_flag], 0
+		mov byte [es:jgr_flag], 0
+		mov byte [es:jls_flag], 0
+		
 		jmp test_start
 	
 cmp_string_found:
