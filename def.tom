@@ -4,16 +4,20 @@ def nmg
 prt "Guess the number"
 inc yyy
 rnd 0 100 ans
-prt ans
 ask str1
 int str1 gss
 inc yyy
-cmp ans gss
-jgr 17
+inc nmg
 cmp ans gss
 jye 19
-prt "more"
-jmp 8
-prt "less"
-jmp 8
-prt "yay"
+cmp ans gss
+jgr 17
+prt "Lower!"
+jmp 7
+prt "Greater!"
+jmp 7
+prt "You got it!"
+inc yyy
+prt nmg
+mov 4 xxx
+prt "tries!"

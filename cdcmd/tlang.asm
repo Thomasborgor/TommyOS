@@ -6,12 +6,13 @@
 ;And all it took was a filesystem
 ;and with that filesystem we are at ~1700 lines again...
 
-mov [SecsPerTrack], ax ;why not prefixed with ES:? because then I would have to change pretty much all of functions.asm.
-mov [Sides], bx
-mov [bootdev], dl
 
-mov ax, 0x2000
-mov es, ax
+
+mov cx, 0x2000
+mov es, cx
+mov [es:SecsPerTrack], ax ;why not prefixed with ES:? because then I would have to change pretty much all of functions.asm.
+mov [es:Sides], bx
+mov [es:bootdev], dl
 
 mov di, skibidi
 save_____that______filename:
@@ -497,9 +498,20 @@ def_string_found:
 			xor dx, dx
 			mov bx, 3
 			div bx
+			;pusha
+			;call os_int_to_string
+			;mov di, ax
+			;call print
+		;	mov ah, 0
+		;	int 16h
+			;call clear_but_ret
+			;popa
+			
+			
 			;quotient in ax 
 			mov di, es:varlocs ;wow am i stupid. FOR SOME GOOFY REASON, every thing in this file when not using SI should be prefixed with ES:
 			add di, ax 
+			add di, ax ;I AM SLACKING!!!!!!!! TWO TIMES NOW WE HAVE BEEN NOT CONVERTING WORDS TO BYTE OFFSETS!
 			;inc di ;why i need to do this just to init a var as 0, IDK but it works!
 			;as is with everything in this codebase, am i right?
 			mov word [es:di], 0
@@ -561,6 +573,8 @@ ask_string_found:
 		loop get_all_chars_loop
 		
 	done_storing_strings:
+	
+	mov byte [es:di], 0
 	
 	mov ah, 2
 	xor bh, bh
@@ -721,10 +735,12 @@ cmp_string_found:
 	cmp ax, [es:placeholder]
 	je equal_comparison
 	mov byte [es:jne_flag], 1
+	mov byte [es:jye_flag], 0
 	second_comparison:
 	cmp ax, [es:placeholder]
 	jl greater_comparison
 	mov byte [es:jls_flag], 1
+	mov byte [es:jgr_flag], 0
 	jmp inc_and_rerun_three
 
 	cmp_xxx_before:
@@ -753,9 +769,11 @@ cmp_string_found:
 		jmp comparisons
 	equal_comparison:
 		mov byte [es:jye_flag], 1
+		mov byte [es:jne_flag], 0
 		jmp inc_and_rerun_three
 	greater_comparison:
 		mov byte [es:jgr_flag], 1
+		mov byte [es:jls_flag], 0
 		jmp inc_and_rerun_three
 
 bel_string_found:
@@ -1436,6 +1454,7 @@ found_a_var_to_print:
 	mov di, ax
 	call print
 	
+	
 	sub word [es:offset_counter], 2
 	call prep_si
 	jmp inc_and_rerun_three
@@ -1867,7 +1886,7 @@ prompt db '> ', 0
 input_string_thing db 'String: ', 0
 skibidi times 12 db 0
 %include "./extra/functions.asm"
-disk_buffer db 24576
+disk_buffer equ 24576
 end_of_file dw 0
 ;this line count should not be anything but 1365. 
 ;just kidding its 1614

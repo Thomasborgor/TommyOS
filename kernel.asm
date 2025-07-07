@@ -856,6 +856,16 @@ load_program:
 	
 	call 0x2000:0x0000
 	
+	mov ax, 0x2000
+	mov es, ax
+	mov ds, ax
+	
+	mov cx, 0x3fff
+	xor eax, eax
+	xor di, di
+	rep stosd
+	
+	
 	mov ax, 0x1000
 	mov es, ax
 	mov ds, ax
