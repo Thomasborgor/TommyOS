@@ -611,19 +611,15 @@ copy_do:
 
 	
 	mov dl, al
-	mov byte [real_dirlist], dl
-	mov [bootdev], dl
-	push es
-	mov ah, 8			; Get drive parameters
+	mov ah, 0x08
 	int 13h
-	pop es
+	jc no_drive
 	and cx, 3Fh			; Maximum sector number
-	mov [SecsPerTrack], cx		; Sector numbers start at 1
+	mov [SecsPerTrack], cx	; Sector numbers start at 1
 	movzx dx, dh			; Maximum head number
 	add dx, 1			; Head numbers start at 0 - add 1 for total
 	mov [Sides], dx
 	call ready_the_drive
-	jc no_drive
 	ready_for_param_seek:
 
 
@@ -637,17 +633,15 @@ copy_do:
 	mov di, input_buffer_copy_copy
 	call os_string_copy
 
-	;mov bx, 1 ;this signifies that we will load the file in the ram page that we are in, not at segment 32768 in this case. GENIUS!
+	
 	mov ax, input_buffer_copy
 	mov cx, 32768
 	call os_load_file_in_segment
-	jc no_file
-
-
 	mov si, [tmp_one]
 	sub si, 2
 	
 	mov [tmp_one], bx
+	jc no_file
 	lodsb
 	cmp al, 65
 	jl unknown_command_place
@@ -657,32 +651,26 @@ copy_do:
 	jle is_a_or_b_2
 	add al, 61
 	mov [bootdev], al
-	;call ready_the_drive
+	push ax
+	call ready_the_drive
+	pop ax
 	mov dl, al
-	mov byte [real_dirlist], dl
-	mov [bootdev], dl
-	push es
-	mov ah, 8			; Get drive parameters
+	mov ah, 0x08
 	int 13h
-	pop es
+	jc failed
 	and cx, 3Fh			; Maximum sector number
-	mov [SecsPerTrack], cx		; Sector numbers start at 1
+	mov [SecsPerTrack], cx	; Sector numbers start at 1
 	movzx dx, dh			; Maximum head number
 	add dx, 1			; Head numbers start at 0 - add 1 for total
 	mov [Sides], dx
 	call ready_the_drive
-	jc no_drive
 	ready_for_param_seek2:
 	cmp byte [si], ':'
 	jne unknown_command_place
 	
-	mov ax, input_buffer_copy_copy
-	call os_remove_file
-	
 	mov cx, [tmp_one]
 	mov bx, 32768
 	mov ax, input_buffer_copy_copy
-	
 	;mov byte  [bootdev], 0x80
 	call os_write_file
 	jc failed
@@ -699,14 +687,11 @@ is_a_or_b:
 	cmp al, 'B'
 	jne failed
 	mov byte [bootdev], 1
-	jmp ready_for_param_seek3
+	call ready_the_drive
+	jmp ready_for_param_seek
 	is_a_one:
 	mov byte [bootdev], 0
-	ready_for_param_seek3:
 	call ready_the_drive
-	jc no_drive
-	call ready_the_drive
-	jc no_drive
 	jmp ready_for_param_seek
 	
 is_a_or_b_2:
@@ -717,21 +702,18 @@ is_a_or_b_2:
 	cmp al, 'B'
 	jne failed
 	mov byte [bootdev], 1
-	
-	jmp ready_for_param_seek4
+	call ready_the_drive
+	jmp ready_for_param_seek2
 	is_a_one_2:
 	mov byte [bootdev], 0
-	ready_for_param_seek4:
 	call ready_the_drive
-	jc no_drive
-	call ready_the_drive
-	jc no_drive
 	jmp ready_for_param_seek2
 	
-
+	
 	
 tmp_dev_one db 0
 tmp_dev_two db 0
+
 
 
 del_file:

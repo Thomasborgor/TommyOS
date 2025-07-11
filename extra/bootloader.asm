@@ -260,10 +260,6 @@ end:					; We've got the file to load!
 	mov dl, byte [bootdev]		; Provide kernel with boot device info
 	mov cx, [SectorsPerTrack]
 	mov bx, [Sides]
-	push ax
-	mov ax, 0x0e01
-	int 0x10
-	pop ax
 	
 
 	jmp 1000h:0000h			; Jump to entry point of loaded kernel!
