@@ -676,6 +676,9 @@ copy_do:
 	cmp byte [si], ':'
 	jne unknown_command_place
 	
+	mov ax, input_buffer_copy_copy
+	call os_remove_file
+	
 	mov cx, [tmp_one]
 	mov bx, 32768
 	mov ax, input_buffer_copy_copy
@@ -696,11 +699,12 @@ is_a_or_b:
 	cmp al, 'B'
 	jne failed
 	mov byte [bootdev], 1
-	call ready_the_drive
-	jc no_drive
-	jmp ready_for_param_seek
+	jmp ready_for_param_seek3
 	is_a_one:
 	mov byte [bootdev], 0
+	ready_for_param_seek3:
+	call ready_the_drive
+	jc no_drive
 	call ready_the_drive
 	jc no_drive
 	jmp ready_for_param_seek
@@ -713,11 +717,13 @@ is_a_or_b_2:
 	cmp al, 'B'
 	jne failed
 	mov byte [bootdev], 1
-	call ready_the_drive
-	jc no_drive
-	jmp ready_for_param_seek2
+	
+	jmp ready_for_param_seek4
 	is_a_one_2:
 	mov byte [bootdev], 0
+	ready_for_param_seek4:
+	call ready_the_drive
+	jc no_drive
 	call ready_the_drive
 	jc no_drive
 	jmp ready_for_param_seek2

@@ -51,7 +51,7 @@ commit:
 
 hard: 
 
-	qemu-system-x86_64 -boot order=c -hda mydisk.img -hdb image2.img
+	qemu-system-x86_64 -boot order=c -hda mydisk.img -hdb image2.img -fda floppy.img
 
 small:
 	qemu-system-x86_64 -boot order=a -fda floppy.img -drive file=mydisk.img,if=ide,index=1

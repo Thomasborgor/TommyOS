@@ -584,7 +584,7 @@ os_write_file:
 
 	call os_file_exists		; Don't overwrite a file if it exists!
 	jnc near .failure
-	
+
 
 	; First, zero out the .free_clusters list from any previous execution
 	pusha
@@ -624,7 +624,6 @@ os_write_file:
 	mov word bx, [.filesize]
 	cmp bx, 0
 	je near .finished
-	
 
 	call disk_read_fat		; Get FAT copy into RAM
 	mov si, disk_buffer + 3		; And point SI at it (skipping first two clusters)
@@ -823,30 +822,30 @@ os_write_file:
 
 	; Now it's time to head back to the root directory, find our
 	; entry and update it with the cluster in use and file size
-	
+
 	call disk_read_root_dir
 
 	mov word ax, [.filename]
 	call disk_get_root_entry
-	
+
 	mov word ax, [.free_clusters]	; Get first free cluster
+
 	mov word [di+26], ax		; Save cluster location into root dir entry
-	
-	mov ax, [.filesize]
-	mov word [di+28], ax
-	
-	mov word [di+30], 0
-	
+
+	mov word cx, [.filesize]
+	mov word [di+28], cx
+
+	mov byte [di+30], 0		; File size
+	mov byte [di+31], 0
+
 	call disk_write_root_dir
 
 .finished:
-	
 	popa
 	clc
 	ret
 
 .failure:
-
 	popa
 	stc				; Couldn't write!
 	ret
@@ -862,6 +861,7 @@ os_write_file:
 	.filename	dw 0
 
 	.free_clusters	times 128 dw 0
+
 ; --------------------------------------------------------------------------
 ; os_file_exists -- Check for presence of file on the floppy
 ; IN: AX = filename location; OUT: carry clear if found, set if not
@@ -912,7 +912,7 @@ os_create_file:
 	call os_file_exists		; Does the file already exist?
 	jnc .exists_error
 
-	;call disk_read_root_dir
+	call disk_read_root_dir
 	; Root dir already read into disk_buffer by os_file_exists
 
 	mov di, disk_buffer		; So point DI at it!
