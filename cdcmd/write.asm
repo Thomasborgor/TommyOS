@@ -33,44 +33,74 @@ call os_load_file
 
 
 
-mov cx, bx
-
+mov cx, bx            ; BX = file size
 mov ax, 0xb800
 mov es, ax
 mov ax, 0x3000
 mov ds, ax
-
 mov si, 0
-mov di, 160
+mov di, 160           ; start at line 1 (skip header)
+xor bp, bp            ; page counter
 
 populate_video_mem:
-    lodsb               ; get byte from [DS:SI] into AL
-    cmp al, 13          ; is it carriage return?
-    je do_a_newline
+    lodsb
+    cmp al, 0dh
+    je parse_newline
 
-    stosb               ; store AL at ES:DI (char)
-    inc di              ; skip color byte
+    stosb
+    inc di
+
+    ; Check for end of page (4000 bytes per page)
+    cmp di, 4000
+    jb continue_loop
+
+    ; Switch to next page
+    inc bp
+    mov ax, bp
+    xor dx, dx
+    mov bx, 256
+    mul bx
+    add ax, 0xb800
+    mov es, ax
+    xor di, di
+
+continue_loop:
     loop populate_video_mem
     jmp prepare_the_screen
 
-do_a_newline:
-    mov bx, 160         ; bytes per line
+parse_newline:
+    ; Calculate padding to end of current line
     mov ax, di
     xor dx, dx
-    div bx              ; get current line number in AX
-    inc ax              ; go to next line
-    mul bx              ; AX *= 160
-    mov di, ax          ; DI = start of next line
-    inc si              ; skip LF (optional depending on input)
-    dec cx              ; adjust loop count manually
-    jmp populate_video_mem
+    mov bx, 160
+    div bx
+    mov ax, 160
+    sub ax, dx
+    add di, ax
+	inc si
+    ; Same page-switch logic in case line wrap hits end of screen
+    cmp di, 4000
+    jb continue_loop
+
+    inc bp
+    mov ax, bp
+    xor dx, dx
+    mov bx, 256
+    mul bx
+    add ax, 0xb800
+    mov es, ax
+    xor di, di
+    jmp continue_loop
+
+
 create_new_file:
 	mov ax, test_txt
 	call custom_create_file
-	mov ax, 0xb800
-	mov es, ax
+	
 
 prepare_the_screen:
+	mov ax, 0xb800
+	mov es, ax
 	mov ax, 0x2000
 	mov ds, ax
 	mov di, 0
@@ -265,190 +295,147 @@ check_for_left_side_cursor:
 		ret
 
 write_file:
-	mov ax, 0xb800
-mov es, ax
-mov ax, 0x2000
-mov ds, ax
-mov di, write_buffer
+    mov ax, 0xb800
+    mov es, ax
+    mov ax, cs
+    mov ds, ax
+    mov byte [temp_dh], 0
 
-mov si, 160
-write_file_get_loop:
-    push di                   ; Save di (write_buffer position)
-    mov di, buffer_buffer     ; di = output buffer
-    push si                   ; Save si (screen offset)
-    call get_trimmed_row_into_buffer
-    pop si                    ; Restore si
-    
-    pop di                    ; Restore write_buffer position
-    call put_that_buffer_in_write_buffer
+    xor di, di
+    mov di, write_buffer
+    xor cx, cx
 
-    add si, 160
-    cmp si, 160*25
-    jle write_file_get_loop
-	
-	add word [ds:b800_offset], 2000
-	cmp word [ds:b800_offset], 0xb800 + (2000 * 8)
-	je prepare_write_file_get_loop
-	
+start_new_page:
+    mov dx, 160         ; skip header line (1 row = 160 bytes)
+    mov bx, 24          ; only process 24 lines per page (lines 1–24)
 
-call trim_crlf_from_write_buffer
-
-call clear
-
-mov ax, 0x2000
-mov es, ax
-mov ds, ax
-
-mov ax, test_txt
-call os_remove_file
-
-mov ax, write_buffer
-call find_string_length
-
-mov cx, ax
-mov bx, write_buffer
-mov ax, test_txt
-call os_write_file
-
-retf
-
-b800_offset dw 0xb800
-
-prepare_write_file_get_loop:
-	xor si, si
-	mov es, [ds:b800_offset]
-	jmp write_file_get_loop
-	
-; In: si = screen offset, di = output buffer
-; Out: buffer_buffer contains trimmed row + CRLF
-get_trimmed_row_into_buffer:
-    push cx
+read_row:
     push bx
-
+    mov si, dx
     mov cx, 80
-    mov bx, di               ; Save start of buffer
+    mov bx, buffer_buffer
 
-get_row_loop:
+read_chars:
     mov al, [es:si]
-    mov [ds:di], al
+    mov [bx], al
     add si, 2
-    inc di
-    loop get_row_loop
+    inc bx
+    loop read_chars
 
-; Trim trailing spaces
-    dec di
-trim_loop:
-    cmp di, bx               ; di >= start of buffer?
-    jb trim_done
-    cmp byte [ds:di], 32
-    jne trim_done
-    dec di
-    jmp trim_loop
+    ; Trim trailing spaces
+    dec bx
+trim_spaces:
+    cmp byte [bx], ' '
+    jne insert_crlf
+    dec bx
+    cmp bx, buffer_buffer
+    jge trim_spaces
 
-trim_done:
-    inc di
-    mov byte [ds:di], 0x0D
-    inc di
-    mov byte [ds:di], 0x0A
-    inc di
-    mov byte [ds:di], 0
+insert_crlf:
+    inc bx
+    mov byte [bx], 0x0D
+    inc bx
+    mov byte [bx], 0x0A
+    inc bx
 
-    pop bx
-    pop cx
-    ret
-	
-; In: di = write_buffer position, buffer_buffer contains trimmed row
-put_that_buffer_in_write_buffer:
-    push si
-    push bx
-
+    ; Append buffer_buffer to write_buffer
     mov si, buffer_buffer
-
-copy_loop:
-    mov al, [ds:si]
-    cmp al, 0
-    je copy_done
-    mov [ds:di], al
+copy_line:
+    mov al, [si]
+    mov [di], al
     inc si
     inc di
-    jmp copy_loop
+    cmp al, 0x0A
+    jne copy_line
 
-copy_done:
     pop bx
-    pop si
-    ret
-	
-trim_crlf_from_write_buffer:
-    push si
-    push di
+    add dx, 160         ; next row
+    dec bx
+    jnz read_row
 
-    mov si, write_buffer
+    ; After 24 rows, prepare next page
+    inc byte [temp_dh]
+    cmp byte [temp_dh], 8
+    je done_reading_pages
 
-; Find null terminator
-find_end:
-    mov al, [ds:si]
-    cmp al, 0
-    je found_end
-    inc si
-    jmp find_end
+    ; Update ES to next video page
+    mov ch, 0
+    mov cl, [temp_dh]
+    mov ax, 0xb800
+do_the_thing:
+    add ax, 0x100
+    loop do_the_thing
+    mov es, ax
+	mov dx, 0
+	mov bx, 25
+    jmp read_row
 
-found_end:
-    dec si                ; Point to last character before null
+done_reading_pages:
 
-trim_loop2:
-    cmp si, write_buffer
-    jb finish_trim        ; Avoid underflow beyond buffer start
+remove_trailing_crlfs:
+    cmp di, write_buffer
+    jbe no_crlf_trim
 
-    cmp byte [ds:si], 0x0A
-    jne finish_trim       ; No LF found, stop
-    mov byte [ds:si], 0   ; Erase LF
+    dec di
+    cmp byte [di], 0x0A
+    jne no_crlf_trim
+    dec di
+    cmp byte [di], 0x0D
+    jne no_crlf_trim
+    jmp remove_trailing_crlfs
 
-    dec si
-    cmp si, write_buffer
-    jb finish_trim
+no_crlf_trim:
+    inc di
+    mov byte [di], 0
 
-    cmp byte [ds:si], 0x0D
-    jne finish_trim       ; No CR found, stop
-    mov byte [ds:si], 0   ; Erase CR
+    ; Clear video pages
+    mov ax, 0x2000
+    mov ds, ax
+    mov es, ax
+    mov byte [current_page], 0
+    mov cx, 7
+clear_loop:
+    call clear
+    inc byte [current_page]
+    loop clear_loop
+    mov ax, 0x0500
+    int 0x10
 
-    dec si
-    jmp trim_loop2         ; Check for next CRLF pair
+    ; Write buffer to file
+    mov ax, test_txt
+    call os_remove_file
 
-finish_trim:
-    pop di
-    pop si
-    ret
+    mov ax, write_buffer
+    call find_string_length
+	;add ax, 500
+    mov cx, ax
+    mov ax, test_txt
+    mov bx, write_buffer
+    call os_write_file
+    call clear
+    retf
 
-	
-si_offset dw 0
-write_buffer_offset dw 0
-	
-something_went_wrong:
-	mov ax, 0x0e01
-	int 0x10
-	jmp $
-	
 find_string_length: ;in ax=location of string
-	mov bx, ax
-	xor cx, cx
-	find_length_loop:
-		cmp byte [bx], 0
-		je we_are_done_here
-		inc cx
-		inc bx
-		jmp find_length_loop
-	we_are_done_here:
-		mov ax, cx
-		ret
-		
+    mov bx, ax
+    xor cx, cx
+find_length_loop:
+    cmp byte [ds:bx], 0
+    je we_are_done_here
+    inc cx
+    inc bx
+    jmp find_length_loop
+we_are_done_here:
+    mov ax, cx
+    ret
 
-sample_data db 'blah blah blah sample data ', 10, 13, 'test test', 0
-	
-	
+; Data section
 buffer_buffer times 81 db 0
 temp_dl dw 0
 temp_dh db 0
-	
+si_offset dw 0
+write_buffer_offset dw 0
+
+
 print:
 	mov ah, 0x0e
 print_char:

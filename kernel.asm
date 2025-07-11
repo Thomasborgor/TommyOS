@@ -130,8 +130,8 @@ main:
 		int 0x10
 		inc word [tmp_one]
 		cmp word [tmp_one], 120
-		jne input_loop
-		jmp parse
+		jge backspace
+		jmp input_loop
 backspace:
 	cmp word [tmp_one], 1
 	jl input_loop
@@ -149,11 +149,12 @@ parse: ;how we are going to do this:
 	dec di
 	do_it_thing:
 	mov byte [di], 0x00
-
+	
 	
 	mov si, input_buffer
 	mov di, buffer
 	call os_string_copy
+	
 	
 	cmp byte [input_buffer], 0
 	je second
@@ -161,22 +162,16 @@ parse: ;how we are going to do this:
 	mov ax, input_buffer
 	call os_string_uppercase
 	
+	
+	
 	mov si, input_buffer
 	mov di, input_buffer_copy
 	call os_string_copy
 	
-	
-	push ax
-	mov si, input_buffer
-	mov di, kernel_iden_two
-	mov cx, 6
-	repe cmpsb
-	je no_kernel
-	pop ax
-	
 	mov di, time_str
 	call compare_string
 	jc print_time
+	
 	
 	mov di, date_str
 	call compare_string
@@ -201,6 +196,7 @@ parse: ;how we are going to do this:
 	mov di, reboot_str
 	call compare_string
 	jc reboot_do
+	
 	
 	mov di, ren_str
 	call compare_string
@@ -231,27 +227,33 @@ parse: ;how we are going to do this:
 	jc new_name
 	
 	;get the input, go to uppercase, figure out the length, 8-length is the number of spaces we need to pad, then add BIN to the end. 
-
+	;https://www.microcenter.com/site/content/custom-pc-builder.aspx?load=818bfcf5-9703-4b47-ac7e-066d1dc75eaa
 	
 	mov di, pcx_extension
 	call test_extension
 	jc yes_run_pcx
+	
 	
 	run_bin:
 	
 	mov ax, input_buffer_copy
 	call os_string_length
 	
+	
 	mov si, input_buffer_copy
 	add si, ax
 	cmp byte [si-4], '.'
 	je check_file_load
 	mov dword [si], '.BIN'
+	
 
 	check_file_load:
 	mov ax, input_buffer_copy
 	call os_file_exists
+	
 	jnc load_program
+	
+	
 	
 	
 	mov si, input_buffer_copy
@@ -319,6 +321,11 @@ hexsave_do:
 	mov si, input_buffer
 	add si, 8
 	mov di, buffer
+	mov cx, 7
+	mov al, 0
+	rep stosb
+	mov di, buffer
+	
 	call hex_to_bin
 	mov ax, si
 	call os_remove_file
@@ -333,14 +340,14 @@ the_file_exists:
 	push si
 	mov ax, input_buffer_copy
 	mov cx, 0x2600
-	call os_load_file
+	call os_load_file_in_segment
 	mov si, 0x2600
 	mov di, buffer
 	call hex_to_bin
 	pop si
 	mov ax, si
 	call os_remove_file
-	mov cx, bx
+	mov cx, dx
 	mov ax, si
 	mov bx, buffer
 	call os_write_file
@@ -354,17 +361,17 @@ hex_to_bin:
 	xor dx, dx
     xor     ax, ax         ; Clear AX
 .next_pair:
-	inc dx
+	
     lodsb                  ; Load first hex char into AL from DS:SI
 	cmp al, 32
 	je .done
     cmp     al, 0
     je      .done          ; If null terminator, we're done
+	inc dx
     call    ascii_to_nibble
     shl     al, 4          ; Move high nibble to upper half of byte
     mov     ah, al         ; Store high nibble in AH
 	
-	inc dx
     lodsb                  ; Load second hex char
 	cmp al, 32
 	je .done
@@ -378,6 +385,7 @@ hex_to_bin:
 
 .done:
 	mov byte [di], 0
+
 	ret
 
 ; ------------------------------
@@ -629,17 +637,17 @@ copy_do:
 	mov di, input_buffer_copy_copy
 	call os_string_copy
 
-	mov bx, 1 ;this signifies that we will load the file in the ram page that we are in, not at segment 32768 in this case. GENIUS!
+	;mov bx, 1 ;this signifies that we will load the file in the ram page that we are in, not at segment 32768 in this case. GENIUS!
 	mov ax, input_buffer_copy
 	mov cx, 32768
 	call os_load_file_in_segment
+	jc no_file
 
 
 	mov si, [tmp_one]
 	sub si, 2
 	
 	mov [tmp_one], bx
-	jc no_file
 	lodsb
 	cmp al, 65
 	jl unknown_command_place
@@ -713,6 +721,8 @@ is_a_or_b_2:
 	call ready_the_drive
 	jc no_drive
 	jmp ready_for_param_seek2
+	
+
 	
 tmp_dev_one db 0
 tmp_dev_two db 0

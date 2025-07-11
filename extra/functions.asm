@@ -829,8 +829,6 @@ os_write_file:
 	mov word ax, [.filename]
 	call disk_get_root_entry
 	
-	cmp di, 0x2600
-	jl save_file
 	mov word ax, [.free_clusters]	; Get first free cluster
 	mov word [di+26], ax		; Save cluster location into root dir entry
 	
@@ -864,24 +862,6 @@ os_write_file:
 	.filename	dw 0
 
 	.free_clusters	times 128 dw 0
-save_file:
-
-	mov ax, [os_write_file.filename]
-	push ax
-	call disk_read_root_dir
-	pop ax
-	mov di, disk_buffer
-	call disk_get_root_entry
-	jc os_write_file.failure
-	
-	mov ax, [os_write_file.free_clusters]
-	mov word [di+26], ax
-	
-	mov ax, [os_write_file.filesize]
-	mov word [di+28], ax
-	mov word [di+30], 0
-	call disk_write_root_dir
-	jmp os_write_file.finished
 ; --------------------------------------------------------------------------
 ; os_file_exists -- Check for presence of file on the floppy
 ; IN: AX = filename location; OUT: carry clear if found, set if not
@@ -1381,6 +1361,8 @@ int_filename_convert:
 	inc cx
 	cmp cx, dx
 	jg .failure			; No extension found = wrong
+	cmp cx, 9
+	je .failure
 	jmp .copy_loop
 
 .extension_found:
