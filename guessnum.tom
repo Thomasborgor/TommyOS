@@ -7,9 +7,11 @@ rnd 000 100 ans
 ask str1
 int str1 gss
 cmp gss ans
-jgr 025
+jye 15
 cmp gss ans
-jls 029
+jgr 027
+cmp gss ans
+jls 031
 inc nmg
 prt "You guessed the number!"
 inc yyy

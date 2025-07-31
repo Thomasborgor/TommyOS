@@ -21,11 +21,12 @@ mov ds, ax
 mov es, ax
 
 
-
 call clear
 mov ax, test_txt
 call os_file_exists
 jc create_new_file
+
+
 
 mov cx, 0x3000
 mov ax, test_txt

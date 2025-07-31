@@ -269,6 +269,10 @@ test_start:	;===================================================================
 	call test_test_string
 	jc int_string_found
 	
+	mov di, hlt_str
+	call test_test_string
+	jc halt
+	
 	;if it doesn't match a string, then we go into syntax_error_halt
 	
 syntax_error_halt:

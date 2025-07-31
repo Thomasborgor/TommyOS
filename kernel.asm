@@ -570,6 +570,7 @@ no_drive:
 yes_run_pcx:
 	mov ax, input_buffer
 	call os_print_pcx
+	jc no_file
 	mov ax, 0
 	int 16h
 	
@@ -859,8 +860,8 @@ load_program:
 	mov ds, ax
 	
 	mov cx, 0x3fff
-	xor eax, eax
-	xor di, di
+	mov eax, 0
+	mov di, 0
 	rep stosd
 	
 	

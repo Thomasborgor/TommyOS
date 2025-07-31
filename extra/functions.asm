@@ -360,10 +360,6 @@ bootd           db 0
 os_load_file_in_segment:
 	call os_string_uppercase
 	call int_filename_convert
-	push ax
-	mov al, [bootdev]
-	mov [bootd], al
-	pop ax
 
 	mov [.filename_loc], ax		; Store filename location
 	mov [.load_position], cx	; And where to load the file!
@@ -395,7 +391,6 @@ os_load_file_in_segment:
 	pusha
 
 	stc				; A few BIOSes clear, but don't set properly
-	mov dl, [bootdev]
 	int 13h				; Read sectors
 	jnc .search_root_dir		; No errors = continue
 
@@ -476,7 +471,7 @@ os_load_file_in_segment:
 	pusha
 
 	stc
-	mov dl, [bootdev]
+	mov dl, [bootd]
 	int 13h
 	jnc .read_fat_ok
 
@@ -504,7 +499,7 @@ os_load_file_in_segment:
 	mov al, 01
 
 	stc
-	mov dl, [bootdev]
+	mov dl, [bootd]
 	int 13h
 	jnc .calculate_next_cluster	; If there's no error...
 
@@ -553,7 +548,7 @@ os_load_file_in_segment:
 	ret
 
 
-	
+	.bootd		db 0 		; Boot device number
 	.cluster	dw 0 		; Cluster of the file we want to load
 	.pointer	dw 0 		; Pointer into disk_buffer, for loading 'file2load'
 
@@ -562,7 +557,6 @@ os_load_file_in_segment:
 	.file_size	dw 0		; Size of the file
 
 	.string_buff	times 12 db 0	; For size (integer) printing
-	
 
 	.err_msg_floppy_reset	db 'os_load_file: Floppy failed to reset', 0
 
@@ -812,8 +806,8 @@ os_write_file:
 
 	mov ah, 3
 	mov al, 1
-	mov dl, [bootdev]
 	stc
+	mov dl, [bootdev]
 	int 13h
 
 	popa
@@ -868,7 +862,6 @@ os_write_file:
 
 	.free_clusters	times 128 dw 0
 
-
 ; --------------------------------------------------------------------------
 ; os_file_exists -- Check for presence of file on the floppy
 ; IN: AX = filename location; OUT: carry clear if found, set if not
@@ -876,7 +869,7 @@ os_write_file:
 os_file_exists:
 	call os_string_uppercase
 	call int_filename_convert	; Make FAT12-style filename
-
+	
 	push ax
 	call os_string_length
 	cmp ax, 13
@@ -919,7 +912,7 @@ os_create_file:
 	call os_file_exists		; Does the file already exist?
 	jnc .exists_error
 
-	;call disk_read_root_dir
+	call disk_read_root_dir
 	; Root dir already read into disk_buffer by os_file_exists
 
 	mov di, disk_buffer		; So point DI at it!
@@ -1037,7 +1030,7 @@ jc errored
 ret
 
 errored:
-	mov ax, 0x0e01
+	mov ax, 0x0e02
 	int 0x10
 	jmp $
 
@@ -1172,9 +1165,73 @@ os_remove_file:
 	stc
 	ret
 
+.failure_write_fat:
+	mov ax, 0x0e03
+	int 0x10
+	jmp .failure
+
 
 	.cluster dw 0
 
+os_seed_random:
+	push ax
+	push dx
+
+	; Generate a random number using the timer counter
+	MOV DX, 0x40         ; Port address for system timer
+	IN  AL, DX           ; Read the timer byte into AL
+
+; Optional: Use the lower bits for randomness
+	AND AL, 0x7F         ; Mask off higher bits for a smaller random number (7-bit range)
+; Now AL contains a "random" value based on the timer counter
+
+
+	mov word [os_random_seed], ax	; Seed will be something like 0x4435 (if it
+					; were 44 minutes and 35 seconds after the hour)
+	pop ax
+	pop dx
+	ret
+
+
+	os_random_seed	dw 0
+
+
+; ------------------------------------------------------------------
+; os_get_random -- Return a random integer between low and high (inclusive)
+; IN: AX = low integer, BX = high integer
+; OUT: CX = random integer
+
+os_get_random:
+	push dx
+	push bx
+	push ax
+
+	sub bx, ax			; We want a number between 0 and (high-low)
+	call .generate_random
+	mov dx, bx
+	add dx, 1
+	mul dx
+	mov cx, dx
+
+	pop ax
+	pop bx
+	pop dx
+	add cx, ax			; Add the low offset back
+	ret
+
+
+.generate_random:
+	push dx
+	push bx
+
+	mov ax, [os_random_seed]
+	mov dx, 0x7383			; The magic number (random.org)
+	mul dx				; DX:AX = AX * DX
+	mov [os_random_seed], ax
+
+	pop bx
+ 	pop dx
+	ret
 
 ; --------------------------------------------------------------------------
 ; os_rename_file -- Change the name of a file on the disk
@@ -1304,6 +1361,8 @@ int_filename_convert:
 	inc cx
 	cmp cx, dx
 	jg .failure			; No extension found = wrong
+	cmp cx, 9
+	je .failure
 	jmp .copy_loop
 
 .extension_found:
@@ -1417,8 +1476,6 @@ disk_read_fat:
 	call disk_convert_l2hts
 
 	mov si, disk_buffer		; Set ES:BX to point to 8K OS buffer
-	mov bx, 1000h
-	mov es, bx
 	mov bx, si
 
 	mov ah, 2			; Params for int 13h: read floppy sectors
@@ -1466,8 +1523,6 @@ disk_write_fat:
 	call disk_convert_l2hts
 
 	mov si, disk_buffer		; Set ES:BX to point to 8K OS buffer
-	mov bx, ds
-	mov es, bx
 	mov bx, si
 
 	mov ah, 3			; Params for int 13h: write floppy sectors
@@ -1500,8 +1555,6 @@ disk_read_root_dir:
 	call disk_convert_l2hts
 
 	mov si, disk_buffer		; Set ES:BX to point to OS buffer
-	mov bx, ds
-	mov es, bx
 	mov bx, si
 
 
@@ -1551,8 +1604,7 @@ disk_write_root_dir:
 	call disk_convert_l2hts
 
 	mov si, disk_buffer		; Set ES:BX to point to OS buffer
-	mov bx, ds
-	mov es, bx
+
 	mov bx, si
 
 	mov ah, 3			; Params for int 13h: write floppy sectors
@@ -1590,6 +1642,7 @@ disk_reset_floppy:
 	ret
 
 
+
 ; --------------------------------------------------------------------------
 ; disk_convert_l2hts -- Calculate head, track and sector for int 13h
 ; IN: logical sector in AX; OUT: correct registers for int 13h
@@ -1622,74 +1675,12 @@ disk_convert_l2hts:
 
 	ret
 
-
 	Sides dw 2
 	SecsPerTrack dw 18
 ; ******************************************************************
 	bootdev db 0			; Boot device number
 ; ******************************************************************
-os_seed_random:
-	push bx
-	push ax
 
-	mov bx, 0
-	mov al, 0x02			; Minute
-	out 0x70, al
-	in al, 0x71
-
-	mov bl, al
-	shl bx, 8
-	mov al, 0			; Second
-	out 0x70, al
-	in al, 0x71
-	mov bl, al
-
-	mov word [os_random_seed], bx	; Seed will be something like 0x4435 (if it
-					; were 44 minutes and 35 seconds after the hour)
-	pop ax
-	pop bx
-	ret
-
-
-	os_random_seed	dw 0
-
-
-; ------------------------------------------------------------------
-; os_get_random -- Return a random integer between low and high (inclusive)
-; IN: AX = low integer, BX = high integer
-; OUT: CX = random integer
-
-os_get_random:
-	push dx
-	push bx
-	push ax
-
-	sub bx, ax			; We want a number between 0 and (high-low)
-	call .generate_random
-	mov dx, bx
-	add dx, 1
-	mul dx
-	mov cx, dx
-
-	pop ax
-	pop bx
-	pop dx
-	add cx, ax			; Add the low offset back
-	ret
-
-
-.generate_random:
-	push dx
-	push bx
-
-	mov ax, [os_random_seed]
-	mov dx, 0x7383			; The magic number (random.org)
-	mul dx				; DX:AX = AX * DX
-	mov [os_random_seed], ax
-
-	pop bx
- 	pop dx
-	ret
 
 ; ==================================================================
 
@@ -2085,6 +2076,7 @@ os_bcd_to_int:
 os_print_pcx:
 	mov cx, 36864			; Load PCX at 36864 (4K after program start)
 	call os_load_file ;loads file at cx:0x0000
+	jc no_pcx_found_bozo
 	
 
 
@@ -2131,6 +2123,11 @@ setpal:
 	out dx, al			; Send to VGA controller
 	loop setpal
 	mov bx, [tmp_location]
+	clc
+	ret
+	
+no_pcx_found_bozo:
+	stc
 	ret
 	
 tmp_location dw 0 ;here we will store where the start of the palette is, then pass it back to the main program, if needed.
