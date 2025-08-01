@@ -14,6 +14,7 @@ not:
 	nasm -fbin ./extra/doogle.asm -o ./extra/doogle.bin
 	nasm -fbin ./extra/fpu.asm -o ./extra/fpu.bin
 
+
 	@echo "Creating Preloaded Images..."
 	#bmp-pcx ./extra/sample.bmp ./extra/logo.pcx
 	rm -f mydisk.img -f floppy.img -f image2.img
@@ -41,6 +42,7 @@ not:
 	mcopy -i floppy.img ./extra/basic.txt ::BASIC.TXT
 	mcopy -i mydisk.img ./extra/doogle.bin ::32.bin
 	mcopy -i mydisk.img ./cdcmd/write.bin ::WRITE.BIN
+	mcopy -i floppy.img ./photos/me.pcx ::me.pcx
 	clear
 	
 commit:
@@ -95,4 +97,3 @@ makehex:
 	
 	
 	
-		

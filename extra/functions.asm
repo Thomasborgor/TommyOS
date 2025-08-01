@@ -2131,3 +2131,307 @@ no_pcx_found_bozo:
 	ret
 	
 tmp_location dw 0 ;here we will store where the start of the palette is, then pass it back to the main program, if needed.
+		
+; --------------------------------------------------------------------------
+; os_write_file -- Save (max 64K) file to disk
+; IN: AX = filename, BX = data location, CX = bytes to write
+; OUT: Carry clear if OK, set if failure
+
+os_write_file_out_segment:
+	pusha
+
+	mov si, ax
+	call os_string_length
+	cmp ax, 0
+	je near .failure
+	mov ax, si
+
+	call os_string_uppercase
+	call int_filename_convert	; Make filename FAT12-style
+	jc near .failure
+
+	mov word [.filesize], cx
+	mov word [.location], bx
+	mov word [.filename], ax
+
+	call os_file_exists		; Don't overwrite a file if it exists!
+	jnc near .failure
+
+
+	; First, zero out the .free_clusters list from any previous execution
+	pusha
+
+	mov di, .free_clusters
+	mov cx, 128
+.clean_free_loop:
+	mov word [di], 0
+	inc di
+	inc di
+	loop .clean_free_loop
+
+	popa
+
+
+	; Next, we need to calculate now many 512 byte clusters are required
+
+	mov ax, cx
+	mov dx, 0
+	mov bx, 512			; Divide file size by 512 to get clusters needed
+	div bx
+	cmp dx, 0
+	jg .add_a_bit			; If there's a remainder, we need another cluster
+	jmp .carry_on
+
+.add_a_bit:
+	add ax, 1
+.carry_on:
+
+	mov word [.clusters_needed], ax
+
+	mov word ax, [.filename]	; Get filename back
+
+	call os_create_file		; Create empty root dir entry for this file
+	jc near .failure		; If we can't write to the media, jump out
+
+	mov word bx, [.filesize]
+	cmp bx, 0
+	je near .finished
+
+	call disk_read_fat		; Get FAT copy into RAM
+	mov si, disk_buffer + 3		; And point SI at it (skipping first two clusters)
+
+	mov bx, 2			; Current cluster counter
+	mov word cx, [.clusters_needed]
+	mov dx, 0			; Offset in .free_clusters list
+
+.find_free_cluster:
+	lodsw				; Get a word
+	and ax, 0FFFh			; Mask out for even
+	jz .found_free_even		; Free entry?
+
+.more_odd:
+	inc bx				; If not, bump our counter
+	dec si				; 'lodsw' moved on two chars; we only want to move on one
+
+	lodsw				; Get word
+	shr ax, 4			; Shift for odd
+	or ax, ax			; Free entry?
+	jz .found_free_odd
+
+.more_even:
+	inc bx				; If not, keep going
+	jmp .find_free_cluster
+
+
+.found_free_even:
+	push si
+	mov si, .free_clusters		; Store cluster
+	add si, dx
+	mov word [si], bx
+	pop si
+
+	dec cx				; Got all the clusters we need?
+	cmp cx, 0
+	je .finished_list
+
+	inc dx				; Next word in our list
+	inc dx
+	jmp .more_odd
+
+.found_free_odd:
+	push si
+	mov si, .free_clusters		; Store cluster
+	add si, dx
+	mov word [si], bx
+	pop si
+
+	dec cx
+	cmp cx, 0
+	je .finished_list
+
+	inc dx				; Next word in our list
+	inc dx
+	jmp .more_even
+
+
+
+.finished_list:
+
+	; Now the .free_clusters table contains a series of numbers (words)
+	; that correspond to free clusters on the disk; the next job is to
+	; create a cluster chain in the FAT for our file
+
+	mov cx, 0			; .free_clusters offset counter
+	mov word [.count], 1		; General cluster counter
+
+.chain_loop:
+	mov word ax, [.count]		; Is this the last cluster?
+	cmp word ax, [.clusters_needed]
+	je .last_cluster
+
+	mov di, .free_clusters
+
+	add di, cx
+	mov word bx, [di]		; Get cluster
+
+	mov ax, bx			; Find out if it's an odd or even cluster
+	mov dx, 0
+	mov bx, 3
+	mul bx
+	mov bx, 2
+	div bx				; DX = [.cluster] mod 2
+	mov si, disk_buffer
+	add si, ax			; AX = word in FAT for the 12 bit entry
+	mov ax, word [ds:si]
+
+	or dx, dx			; If DX = 0, [.cluster] = even; if DX = 1 then odd
+	jz .even
+
+.odd:
+	and ax, 000Fh			; Zero out bits we want to use
+	mov di, .free_clusters
+	add di, cx			; Get offset in .free_clusters
+	mov word bx, [di+2]		; Get number of NEXT cluster
+	shl bx, 4			; And convert it into right format for FAT
+	add ax, bx
+
+	mov word [ds:si], ax		; Store cluster data back in FAT copy in RAM
+
+	inc word [.count]
+	inc cx				; Move on a word in .free_clusters
+	inc cx
+
+	jmp .chain_loop
+
+.even:
+	and ax, 0F000h			; Zero out bits we want to use
+	mov di, .free_clusters
+	add di, cx			; Get offset in .free_clusters
+	mov word bx, [di+2]		; Get number of NEXT free cluster
+
+	add ax, bx
+
+	mov word [ds:si], ax		; Store cluster data back in FAT copy in RAM
+
+	inc word [.count]
+	inc cx				; Move on a word in .free_clusters
+	inc cx
+
+	jmp .chain_loop
+
+
+
+.last_cluster:
+	mov di, .free_clusters
+	add di, cx
+	mov word bx, [di]		; Get cluster
+
+	mov ax, bx
+
+	mov dx, 0
+	mov bx, 3
+	mul bx
+	mov bx, 2
+	div bx				; DX = [.cluster] mod 2
+	mov si, disk_buffer
+	add si, ax			; AX = word in FAT for the 12 bit entry
+	mov ax, word [ds:si]
+
+	or dx, dx			; If DX = 0, [.cluster] = even; if DX = 1 then odd
+	jz .even_last
+
+.odd_last:
+	and ax, 000Fh			; Set relevant parts to FF8h (last cluster in file)
+	add ax, 0FF80h
+	jmp .finito
+
+.even_last:
+	and ax, 0F000h			; Same as above, but for an even cluster
+	add ax, 0FF8h
+
+
+.finito:
+	mov word [ds:si], ax
+
+	call disk_write_fat		; Save our FAT back to disk
+
+
+	; Now it's time to save the sectors to disk!
+
+	mov cx, 0
+
+.save_loop:
+	mov di, .free_clusters
+	add di, cx
+	mov word ax, [di]
+
+	cmp ax, 0
+	je near .write_root_entry
+
+	pusha
+
+	add ax, 31
+
+	call disk_convert_l2hts
+
+	mov word bx, [.location]
+	mov es, bx
+	mov bx, 0
+
+	mov ah, 3
+	mov al, 1
+	mov dl, [bootdev]
+	stc
+	int 13h
+
+	popa
+
+	add word [.location], 0x20
+	inc cx
+	inc cx
+	jmp .save_loop
+
+
+.write_root_entry:
+
+	; Now it's time to head back to the root directory, find our
+	; entry and update it with the cluster in use and file size
+
+	call disk_read_root_dir
+
+	mov word ax, [.filename]
+	call disk_get_root_entry
+
+	mov word ax, [.free_clusters]	; Get first free cluster
+
+	mov word [di+26], ax		; Save cluster location into root dir entry
+
+	mov word cx, [.filesize]
+	mov word [di+28], cx
+
+	mov byte [di+30], 0		; File size
+	mov byte [di+31], 0
+
+	call disk_write_root_dir
+
+.finished:
+	popa
+	clc
+	ret
+
+.failure:
+	popa
+	stc				; Couldn't write!
+	ret
+
+
+	.filesize	dw 0
+	.cluster	dw 0
+	.count		dw 0
+	.location	dw 0
+
+	.clusters_needed	dw 0
+
+	.filename	dw 0
+
+	.free_clusters	times 128 dw 0

@@ -3,15 +3,15 @@
 import argparse
 import subprocess
 
-def convert_to_pcx(input_image, output_pcx):
+def convert_to_pcx(input_image, output_pcx, res):
     try:
         subprocess.run([
             "convert",
             input_image,
-            "-resize", "320x200",
+            "-resize", res,
             "-background", "black",
             "-gravity", "center",
-            "-extent", "320x200",
+            "-extent", res,
             "-colors", "48",
             output_pcx
         ], check=True)

@@ -636,8 +636,8 @@ copy_do:
 
 	
 	mov ax, input_buffer_copy
-	mov cx, 32768
-	call os_load_file_in_segment
+	mov cx, 0x2000
+	call os_load_file
 	mov si, [tmp_one]
 	sub si, 2
 	
@@ -670,10 +670,10 @@ copy_do:
 	jne unknown_command_place
 	
 	mov cx, [tmp_one]
-	mov bx, 32768
+	mov bx, 0x2000
 	mov ax, input_buffer_copy_copy
 	;mov byte  [bootdev], 0x80
-	call os_write_file
+	call os_write_file_out_segment
 	jc failed
 	
 	call ready_the_drive
