@@ -162,8 +162,6 @@ parse: ;how we are going to do this:
 	mov ax, input_buffer
 	call os_string_uppercase
 	
-	
-	
 	mov si, input_buffer
 	mov di, input_buffer_copy
 	call os_string_copy
@@ -568,7 +566,7 @@ no_drive:
 
 	
 yes_run_pcx:
-	mov ax, input_buffer
+	mov ax, input_buffer_copy
 	call os_print_pcx
 	jc no_file
 	mov ax, 0
@@ -607,10 +605,7 @@ copy_do:
 	jle is_a_or_b
 	add al, 61
 	mov [bootdev], al
-	
-	
-
-	
+	push es
 	mov dl, al
 	mov ah, 0x08
 	int 13h
@@ -620,6 +615,7 @@ copy_do:
 	movzx dx, dh			; Maximum head number
 	add dx, 1			; Head numbers start at 0 - add 1 for total
 	mov [Sides], dx
+	pop es
 	call ready_the_drive
 	ready_for_param_seek:
 
@@ -630,19 +626,20 @@ copy_do:
 	add si, [tmp_one]
 	add si, 9
 	mov [tmp_one], si
-	
+	pusha
 	mov di, input_buffer_copy_copy
 	call os_string_copy
-
+	popa
 	
 	mov ax, input_buffer_copy
 	mov cx, 0x2000
 	call os_load_file
+	
 	mov si, [tmp_one]
 	sub si, 2
 	
 	mov [tmp_one], bx
-	jc no_file
+	
 	lodsb
 	cmp al, 65
 	jl unknown_command_place
@@ -655,6 +652,7 @@ copy_do:
 	push ax
 	call ready_the_drive
 	pop ax
+	push es
 	mov dl, al
 	mov ah, 0x08
 	int 13h
@@ -664,6 +662,7 @@ copy_do:
 	movzx dx, dh			; Maximum head number
 	add dx, 1			; Head numbers start at 0 - add 1 for total
 	mov [Sides], dx
+	pop es
 	call ready_the_drive
 	ready_for_param_seek2:
 	cmp byte [si], ':'
@@ -676,7 +675,13 @@ copy_do:
 	call os_write_file_out_segment
 	jc failed
 	
+	mov ax, 0x1000
+	mov es, ax
+	mov ds, ax
+
+	
 	call ready_the_drive
+	clc
 	
 	jmp second
 	
@@ -959,7 +964,6 @@ no_drive_msg db 10, 13, 'Drive not present', 0
 real_dirlist db 0
 tmp_one dw 0
 
-previous_file_run times 13 db 0
 input_buffer times 120 db 0
 input_buffer_copy times 60 db 0
 input_buffer_copy_copy times 60 db 0
