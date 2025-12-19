@@ -47,7 +47,7 @@ bootloader_start:
 	mov [bootdev], dl		; Save boot device number
 	mov ah, 8			; Get drive parameters
 	int 13h
-	jc fatal_disk_error
+	jc reboot
 	and cx, 3Fh			; Maximum sector number
 	mov [SectorsPerTrack], cx	; Sector numbers start at 1
 	movzx dx, dh			; Maximum head number
@@ -66,8 +66,7 @@ floppy_ok:				; Ready to read first block of data
 	mov es, bx
 	mov bx, si
 
-	mov ah, 2			; Params for int 13h: read floppy sectors
-	mov al, 14			; And read 14 of them
+	mov ax, 0x020d
 
 	pusha				; Prepare to enter loop
 
@@ -112,24 +111,21 @@ next_root_entry:
 
 	xchg dx, cx			; Get the original CX back
 	loop next_root_entry
-
-	mov si, file_not_found		; If kernel is not found, bail out
-	call print_string
 	jmp reboot
 
 
 found_file_to_load:			; Fetch cluster and load FAT into RAM
 	mov ax, word [es:di+0Fh]	; Offset 11 + 15 = 26, contains 1st cluster
+	
 	mov word [cluster], ax
 
 	mov ax, 1			; Sector 1 = first sector of first FAT
 	call l2hts
 
-	mov di, buffer			; ES:BX points to our buffer
-	mov bx, di
+	;mov di, buffer			; ES:BX points to our buffer
+	mov bx, buffer
 
-	mov ah, 2			; int 13h params: read (FAT) sectors
-	mov al, 9			; All 9 sectors of 1st FAT
+	mov ax, 0x0209
 
 	pusha				; Prepare to enter loop
 
@@ -144,14 +140,7 @@ read_fat:
 	jnc read_fat_ok			; If read went OK, skip ahead
 	call reset_floppy		; Otherwise, reset floppy controller and try again
 	jnc read_fat			; Floppy reset OK?
-
-; ******************************************************************
-fatal_disk_error:
-; ******************************************************************
-	mov si, disk_error		; If not, print error message and reboot
-	call print_string
-	jmp reboot			; Fatal double error
-
+	jmp reboot
 
 read_fat_ok:
 	popa
@@ -161,8 +150,7 @@ read_fat_ok:
 	mov bx, 0
 
 
-	mov ah, 2			; int 13h floppy read params
-	mov al, 1
+	mov ax, 0x0201
 
 	push ax				; Save in case we (or int calls) lose it
 
@@ -189,10 +177,10 @@ load_file_sector:
 
 calculate_next_cluster:
 	mov ax, [cluster]
-	mov dx, 0
+	xor dx, dx
 	mov bx, 3
 	mul bx
-	mov bx, 2
+	dec bx
 	div bx				; DX = [cluster] mod 2
 	mov si, buffer
 	add si, ax			; AX = word in FAT for the 12 bit entry
@@ -241,32 +229,15 @@ reboot:
 	int 19h				; Reboot the system
 	jmp $
 
-print_string:				; Output string in SI to screen
-	pusha
-
-	mov ah, 0Eh			; int 10h teletype function
-
-.repeat:
-	lodsb				; Get char from string
-	cmp al, 0
-	je .done			; If char is zero, end of string
-	int 10h				; Otherwise, print it
-	jmp short .repeat
-
-.done:
-	popa
-	ret
 
 
 reset_floppy:		; IN: [bootdev] = boot device; OUT: carry set on error
-	push ax
-	push dx
+	pusha
 	mov ax, 0
 	mov dl, byte [bootdev]
 	stc
 	int 13h
-	pop dx
-	pop ax
+	popa
 	ret
 
 
@@ -302,9 +273,6 @@ l2hts:			; Calculate head, track and sector settings for int 13h
 ; STRINGS AND VARIABLES
 
 	kern_filename	db "KERNEL  BIN"	; MikeOS kernel filename
-
-	disk_error	db "F", 0
-	file_not_found	db "K", 0
 
 	bootdev		db 0 	; Boot device number
 	cluster		dw 0 	; Cluster of the file we want to load

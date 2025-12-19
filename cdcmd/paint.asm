@@ -2,9 +2,9 @@
 
 mov cx, 0x2000
 mov es, cx
-mov [es:SecsPerTrack], ax ;why not prefixed with ES:? because then I would have to change pretty much all of functions.asm.
-mov [es:Sides], bx
-mov [es:bootdev], dl
+mov [SecsPerTrack], ax ;why not prefixed with ES:? because then I would have to change pretty much all of functions.asm.
+mov [Sides], bx
+mov [bootdev], dl
 
 
 mov di, filename_buf2

@@ -406,13 +406,16 @@ clear_loop:
     mov ax, test_txt
     call os_remove_file
 
+
     mov ax, write_buffer
     call find_string_length
 	;add ax, 500
+
     mov cx, ax
     mov ax, test_txt
     mov bx, write_buffer
     call os_write_file
+
     call clear
     retf
 
