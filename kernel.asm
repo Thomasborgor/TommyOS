@@ -43,7 +43,7 @@ main1:
 	call clear
 	mov ah, 0x02 ;set cursor
 	mov dh, 7
-	mov dl, 23
+	mov dl, 27
 	int 0x10
 	
 	mov si, ascii11
@@ -58,7 +58,7 @@ main1:
 		jmp special_print_loop
 	weird_newline:
 		inc byte dh
-		mov dl, 23
+		mov dl, 27
 		mov ah, 2
 		int 0x10
 		inc SI
@@ -919,10 +919,10 @@ no_modify_kernel:
 
 no_txt_msg db 10, 13, 'You cannot run a text file', 0
 no_tom_msg db 10, 13, 'You cannot run a tom file', 0
-kernel_ver db 'TommyOS Kernel v1.1', 10, 13, 'TDOS Prompt', 0
+kernel_ver db 'Triton_ Kernel v1.1',0
 backspace_msg db 0x08, ' ', 0x08, 0
 unkown_command db 10, 13,'Unknown command', 0
-no_execute_kernel db 10, 13,'You cannot execute KERNEL.BIN,', 10, 13, 'as it is a core file and will', 10, 13, 'make TommyOS unusable!', 0
+no_execute_kernel db 10, 13,'You cannot execute KERNEL.BIN,', 10, 13, 'as it is a core file and will', 10, 13, 'make Triton_ unusable!', 0
 nice_try db 10, 13, 'Nice try.', 0
 no_file_msg db 10, 13,'File not found or none specified.', 0
 skibidi db 10, 13, 'Errored', 0 ;what was this for?
@@ -973,7 +973,7 @@ input_buffer_copy_copy times 60 db 0
 
 counter dw 0
 
-ascii11 db '  --- __           \/  __  __ ', 10, 13, '  /  / / /\/\ /\/\ /  / / /_  ', 10, 13, '     ~~               ~~  __/ ', 10, 13,0
+ascii11 db '  --- _  . --- __  __', 10, 13, '  /  /  /  /  / / / / ___', 10, 13, '              ~~     ', 10, 13,0
 shutdown_msg db 'You can now turn off your machine.', 0
 
 msg2 db "V1.1", 10, 13, 0

@@ -6,13 +6,14 @@ not:
 	nasm -fbin ./extra/bootloader.asm -o ./extra/hddboot.bin
 	nasm -fbin kernel.asm -o kernel.bin
 	nasm -fbin ./cdcmd/write.asm -o ./cdcmd/write.bin
-	nasm -fbin ./cdcmd/screensaver.asm -o ./cdcmd/screensaver.bin
+	nasm -fbin ./cdcmd/scrnsavr.asm -o ./cdcmd/screensaver.bin
 	nasm -fbin ./cdcmd/tlang.asm -o ./cdcmd/tlang.bin
 	nasm -fbin ./cdcmd/haha.asm -o ./cdcmd/haha.bin
 	nasm -fbin ./cdcmd/paint.asm -o ./cdcmd/paint.bin
 	nasm -fbin ./cdcmd/32.asm -o ./cdcmd/32.bin
 	nasm -fbin ./extra/doogle.asm -o ./extra/doogle.bin
 	nasm -fbin ./extra/fpu.asm -o ./extra/fpu.bin
+	nasm -fbin ./cdcmd/basic2.asm -o ./cdcmd/basic2.bin
 
 	@echo "Creating Preloaded Images..."
 	#bmp-pcx ./extra/sample.bmp ./extra/logo.pcx
@@ -41,6 +42,7 @@ not:
 	mcopy -i floppy.img ./extra/basic.txt ::BASIC.TXT
 	mcopy -i mydisk.img ./extra/doogle.bin ::32.bin
 	mcopy -i mydisk.img ./cdcmd/write.bin ::WRITE.BIN
+	mcopy -i floppy.img ./cdcmd/basic2.bin ::B.BIN
 	clear
 	
 commit:

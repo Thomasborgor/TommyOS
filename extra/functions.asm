@@ -1958,12 +1958,12 @@ os_int_to_string:
 .pop:
 	pop dx				; Pop off values in reverse order, and add 48 to make them digits
 	add dl, '0'			; And save them in the string, increasing the pointer each time
-	mov es:[di], dl
+	mov [di], dl
 	inc di
 	dec cx
 	jnz .pop
 
-	mov byte es:[di], 0		; Zero-terminate string
+	mov byte [di], 0		; Zero-terminate string
 
 	popa
 	mov ax, .t			; Return location of string
@@ -2075,9 +2075,7 @@ os_bcd_to_int:
 
 os_print_pcx:
 	mov cx, 36864			; Load PCX at 36864 (4K after program start)
-	call os_load_file ;loads file at cx:0x0000
-	jc no_pcx_found_bozo
-	
+	call os_load_file
 
 
 	mov ah, 0			; Switch to graphics mode
@@ -2088,12 +2086,9 @@ os_print_pcx:
 	mov ax, 0A000h			; ES = video memory
 	mov es, ax
 
-
-	mov si, 80h
-	mov ax, 36864		; Move source to start of image data
+	mov ax, 36864
 	mov ds, ax
-					; (First 80h bytes is header)
-
+	mov si, 0x80
 	mov di, 0			; Start our loop at top of video RAM
 
 decode:
@@ -2108,8 +2103,7 @@ single:
 	rep stosb			; And show it (or all of them)
 	cmp di, 64001
 	jb decode
-	
-	mov [tmp_location], si
+
 
 	mov dx, 3c8h			; Palette index register
 	mov al, 0			; Start at colour 0
@@ -2122,6 +2116,7 @@ setpal:
 	shr al, 2			; Palettes divided by 4, so undo
 	out dx, al			; Send to VGA controller
 	loop setpal
+
 	mov bx, [tmp_location]
 	clc
 	ret
