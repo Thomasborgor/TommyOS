@@ -198,8 +198,9 @@ mov al, [di+1]
 mov [var_buffer+1], al
 call var_to_int
 add ax, ax
-call os_int_to_string
+
 or ax, 0x8000
+
 mov dx, ax
 jmp .next
 add_add:
@@ -489,19 +490,28 @@ jmp parse
 
 parse_mov:
 add bx, 5
-mov ax, [bytecode_buffer+bx]
+mov ax, [bytecode_buffer+bx] ; get second variable
 
 sub bx, 2
 mov cx, [bytecode_buffer+bx]
+
 test cx, 0x8000
 jnz .get_a_var
-
-mov bx, ax
+; a number
+;cx is already a number
 .next:
+mov bx, ax ; move second var offset into bx
+
 mov [variables+bx], cx
 jmp end
-.get_a_var:
+.get_a_var: ;we must get CX and load it with the number from the variable
+
+push ax
 and cx, 0x7fff
+
+mov bx, cx
+mov cx, [variables+bx]
+pop ax
 jmp .next
 
 parse_add:
