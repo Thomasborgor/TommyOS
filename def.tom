@@ -1,4 +1,2 @@
-mov 123 var
-mov 124 one
-mov var one
-prt one
+dec var
+prt var

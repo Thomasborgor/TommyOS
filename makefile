@@ -1,4 +1,6 @@
 # Variables
+export TERM := xterm-256color
+
 
 # Default target
 not:

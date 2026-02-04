@@ -704,25 +704,20 @@ prt_str db 'prt', 0 ;print a var or a string ; DONE
 sub_str db 'sub', 0 ;sub a value from a var ; DONE
 clr_str db 'clr', 0 ;
 jmp_str db 'jmp', 0 ;jump to a line ; DONE
-inc_str db 'inc', 0 ;add 1 to a value
-dec_str db 'dec', 0 ;sub 1 from a value
-cmd_str db 'cmp', 0;compare a number and a var, OR var and a var
-jye_str db 'jye', 0 ;jump if equal
-jne_str db 'jne', 0 ;jump if not equal
-hlt_str db 'hlt', 0 ;stop program instantly
+inc_str db 'inc', 0 ;add 1 to a value DONE
+dec_str db 'dec', 0 ;sub 1 from a value DONE
+cmd_str db 'cmp', 0;compare a number and a var, OR var and a var DONE
+jye_str db 'jye', 0 ;jump if equal DONE
+jne_str db 'jne', 0 ;jump if not equal DONE
+hlt_str db 'hlt', 0 ;stop program instantly 
 del_str db 'del', 0 ;delays for numbers ticks
-jgr_str db 'jgr', 0 ;jump if greater
-jls_str db 'jls', 0 ;jump if lesser
-non_str db 'non', 0 ;used for jump commands to skip the page changing process, making it faster WOW THATS OLD
+jgr_str db 'jgr', 0 ;jump if greater DONE
+jls_str db 'jls', 0 ;jump if lesser DONE
 rem_str db 'rem', 0 ;used to make comments, code is about 5 lines! (they are for identifying the command!!!)
-bel_str db 'bel', 0 ;two params, first is frequency which is either var or num, then set num for the second param X
-getky_str db 'getky', 0 ;two params, key looking for in quotes, non if any, and then var to save to if first param is not non
+bel_str db 'bel', 0 ;two params, first is frequency which is either var or num, then set num for the second param 
+getky_str db 'getky', 0 ;two params, keycode, and if 0 is keycode then var to save the result keypress to
 ask_str db 'ask', 0 ;takes in one param, and that is the string name. Either st1 or st2
-def_str db 'def', 0 ;one param, volatile up to 3 char variable defined and set to zero X
-cmpsr_str db 'cmpsb', 0 ;no params as there is only two strings to compare WHY THE FREAK I NAMED IT 'CMPSR', I HAVE NO IDEA. CMPSB IS MUCH BETTER.
-rand_str db 'rnd', 0 ;takes in THREE PARAMS (scary) first two are bounds and last is variable to save it too (sorry no strings)
-int_str db 'int', 0 ;two params, first the string (with offset) that will be converted into an int at var param two.
-
+cmpsr_str db 'cmpsr', 0 ;no params
 %include "./extra/functions.asm"
 
 disk_buffer equ 24576
